@@ -8,6 +8,7 @@
   --bg:#FAFAF9; --surface:#FFFFFF; --sunken:#F1F1EF; --ink:#16171A; --muted:#7C7F87; --faint:#B4B6BC; --line:#E9E9E6;
   --accent:#E2541B; --accent-ink:#FFFFFF; --accent-soft:#FCEBE3;
   --ok:#2F8A4E; --ok-soft:#E3F2E8; --warn:#C2362B;
+  --tree:#2F8A4E; --tree-2:#7DB88F; --trunk:#A08670; --soil:#E4E3DE;
   --p1:var(--accent); --ticket-line:var(--line);
   --f-sans:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
@@ -15,11 +16,13 @@
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#111113; --surface:#18181B; --sunken:#1E1E22; --ink:#EDEDEF; --muted:#8B8C94; --faint:#55565D; --line:#26262B;
   --accent:#FF7A3D; --accent-ink:#111113; --accent-soft:#33211A;
-  --ok:#5CC27F; --ok-soft:#18291F; --warn:#FF7468; color-scheme:dark}}
+  --ok:#5CC27F; --ok-soft:#18291F; --warn:#FF7468;
+  --tree:#5CC27F; --tree-2:#3C8A57; --trunk:#6E5E52; --soil:#2A2A2F; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#111113; --surface:#18181B; --sunken:#1E1E22; --ink:#EDEDEF; --muted:#8B8C94; --faint:#55565D; --line:#26262B;
   --accent:#FF7A3D; --accent-ink:#111113; --accent-soft:#33211A;
-  --ok:#5CC27F; --ok-soft:#18291F; --warn:#FF7468; color-scheme:dark}
+  --ok:#5CC27F; --ok-soft:#18291F; --warn:#FF7468;
+  --tree:#5CC27F; --tree-2:#3C8A57; --trunk:#6E5E52; --soil:#2A2A2F; color-scheme:dark}
 
 *{box-sizing:border-box}
 html,body{background:var(--bg);color:var(--ink)}
@@ -312,6 +315,20 @@ input.box:checked::after{content:"";width:10px;height:6px;border-left:2.4px soli
 ul.help{margin:0;padding-left:20px;display:grid;gap:8px;font-size:15px;line-height:1.5}
 ul.help li::marker{color:var(--faint)}
 .dots{max-width:none}
+/* ---------- bosque: un espacio por día del objetivo ---------- */
+.forest{display:grid;gap:4px}
+.sec-head h3{font-size:14px;font-weight:700;letter-spacing:-.01em}
+.forest svg{display:block;width:100%;height:auto;margin:0 auto}
+.forest .soil{fill:var(--soil)}
+.forest .future .soil{opacity:.5}
+.forest .seed{fill:none;stroke:var(--accent);stroke-width:.45}
+.forest .lf{fill:var(--tree)}
+.forest .lf2{fill:var(--tree-2)}
+.forest .tk{fill:var(--trunk)}
+.forest .stem{fill:none;stroke:var(--tree);stroke-width:.5;stroke-linecap:round}
+.forest .fruit{fill:var(--accent)}
+.forest .grow{transform-box:fill-box;transform-origin:50% 100%;animation:grow .8s cubic-bezier(.2,.8,.3,1.15) both}
+@keyframes grow{from{transform:scale(.15);opacity:0}}
 </style>
 
 
@@ -451,6 +468,65 @@ function goalWeek(g){ // 0 = aún no empieza
   return Math.max(1, Math.min(goalWeeks(g), Math.floor(diffDays(g.start, today()) / 7) + 1));
 }
 
+/* ================= bosque ================= */
+// Cada día entre el inicio y la fecha límite es un espacio de tierra. Lo que hagas ese día en el frente del objetivo lo llena:
+// 1 brote (solo el mínimo del hábito) · 2 árbol (una tarea del frente o el hábito completo) · 3 árbol con fruto (la Principal era de este frente)
+const forestOn = g => !!(g && g.frontId && g.start && g.deadline && g.deadline >= g.start);
+function forestMap(g){
+  const lvl = {}, up = (d, v) => { if (d && v > (lvl[d] || 0)) lvl[d] = v; };
+  S.tasks.forEach(t => { if (t.frontId !== g.frontId || !t.done) return; up(t.doneAt, 2); if (t.slot === "critical") up(t.date, 3); });
+  S.habits.forEach(h => { if (h.frontId === g.frontId) Object.entries(h.log || {}).forEach(([d, v]) => up(d, v === "min" ? 1 : 2)); });
+  return lvl;
+}
+function forestDays(g){
+  const lvl = forestMap(g), n = Math.min(diffDays(g.start, g.deadline) + 1, 52 * 7);
+  return Array.from({length:n}, (_, i) => { const d = addDays(g.start, i); return {d, i, lvl:lvl[d] || 0}; });
+}
+function forestGrow(fid, to){ // texto para el aviso si hoy crece algo en el bosque del frente (se calcula antes de guardar)
+  const d = today(), g = fid && S.goals.find(x => x.frontId === fid && forestOn(x) && x.start <= d && d <= x.deadline);
+  if (!g) return "";
+  const from = forestMap(g)[d] || 0;
+  if (to <= from) return "";
+  if (!from) return to === 1 ? " Brotó una planta en tu bosque." : " Creció un árbol en tu bosque.";
+  return to === 3 ? " Tu árbol dio fruto." : " El brote ya es un árbol.";
+}
+const TREES = [ // variantes geométricas y simétricas en una celda de 10×12; el suelo está en y=11
+  {body:'<rect class="tk" x="4.55" y="8.8" width=".9" height="2.2" rx=".3"/><path class="lf" d="M5 2.7L7.9 6.9H2.1z"/><path class="lf" d="M5 4.7L8.6 9.3H1.4z"/>',
+   fruit:'<circle class="fruit" cx="5" cy="2.6" r=".75"/>'},
+  {body:'<rect class="tk" x="4.55" y="7.2" width=".9" height="3.8" rx=".3"/><circle class="lf2" cx="5" cy="5.6" r="2.9"/>',
+   fruit:'<circle class="fruit" cx="3.9" cy="4.9" r=".5"/><circle class="fruit" cx="6.2" cy="5.5" r=".5"/><circle class="fruit" cx="4.9" cy="7" r=".5"/>'},
+  {body:'<rect class="tk" x="4.55" y="8.6" width=".9" height="2.4" rx=".3"/><ellipse class="lf" cx="5" cy="5.9" rx="2" ry="3.5"/>',
+   fruit:'<circle class="fruit" cx="4.3" cy="4.7" r=".48"/><circle class="fruit" cx="5.8" cy="6.6" r=".48"/>'}
+];
+const SPROUT = '<path class="stem" d="M5 11V8.5"/><ellipse class="lf2" cx="3.95" cy="8.35" rx="1.2" ry=".58" transform="rotate(-28 3.95 8.35)"/><ellipse class="lf2" cx="6.05" cy="8.35" rx="1.2" ry=".58" transform="rotate(28 6.05 8.35)"/>';
+const forestSeen = {}; // nivel de hoy en el último dibujo, para animar solo lo que acaba de crecer
+function forestSvg(g, days){
+  const t = today(), weeks = Math.ceil(days.length / 7);
+  const k = weeks <= 5 ? 1 : weeks <= 12 ? 2 : weeks <= 24 ? 3 : 4, cols = 7 * k, rows = Math.ceil(days.length / cols);
+  const cells = days.map(x => {
+    const v = (x.i * 5 + Math.floor(x.i / 7) * 2) % 3, cls = x.d > t ? "future" : "";
+    let art = "";
+    if (x.d <= t && x.lvl === 1) art = SPROUT;
+    else if (x.d <= t && x.lvl >= 2) art = TREES[v].body + (x.lvl === 3 ? TREES[v].fruit : "");
+    else if (x.d === t) art = '<circle class="seed" cx="5" cy="10" r=".85"/>';
+    let grow = "";
+    if (x.d === t){ const prev = forestSeen[g.id]; forestSeen[g.id] = x.lvl; if (prev !== undefined && x.lvl > prev) grow = ' class="grow"'; }
+    return `<g class="${cls}" transform="translate(${(x.i % cols) * 10} ${Math.floor(x.i / cols) * 12})"><ellipse class="soil" cx="5" cy="11" rx="3.4" ry=".75"/>${art ? `<g${grow}>${art}</g>` : ""}</g>`;
+  }).join("");
+  return `<svg viewBox="0 0 ${cols * 10} ${rows * 12}" style="max-width:${cols * 44}px" aria-hidden="true">${cells}</svg>`;
+}
+function forestStats(g, days){
+  const t = today(), past = days.filter(x => x.d <= t);
+  return { trees:past.filter(x => x.lvl >= 2).length, sprouts:past.filter(x => x.lvl === 1).length, left:days.length - past.length, total:days.length };
+}
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+function forestBlock(g){
+  const days = forestDays(g), st = forestStats(g, days);
+  const label = join([plural(st.trees, "árbol", "árboles"), st.sprouts ? plural(st.sprouts, "brote", "brotes") : "", st.left ? `${st.left} por crecer` : ""]);
+  return `<div class="forest" role="img" aria-label="Bosque: ${st.trees} árboles y ${st.sprouts} brotes en ${st.total} días">
+    <div class="sec-head" style="margin-bottom:2px"><h3>Bosque</h3><span class="count">${label}</span>${info("bosque")}</div>${forestSvg(g, days)}</div>`;
+}
+
 /* ================= asignar tareas ================= */
 function assign(id, date, slot, quiet){
   const t = task(id); if (!t) return false;
@@ -472,11 +548,12 @@ function assign(id, date, slot, quiet){
 function unassign(id){ const t = task(id); if (t) put("tasks", {...t, date:null, slot:null}); }
 function toggleDone(id){
   const t = task(id); if (!t) return;
-  const done = !t.done;
+  const done = !t.done, win = done && t.slot === "critical" && t.date === today();
+  const grow = done ? forestGrow(t.frontId, win ? 3 : 2) : "";
   put("tasks", {...t, done, doneAt: done ? today() : null});
   const hs = syncHabit(t, done);
-  if (done && t.slot === "critical" && t.date === today()) toast(hs.length ? `Día ganado. Hábito ${hs.join(" y ")} marcado.` : "Día ganado.");
-  else if (done && hs.length) toast(`Hábito ${hs.join(" y ")} marcado.`);
+  const msg = [win ? "Día ganado." : "", done && hs.length ? `Hábito ${hs.join(" y ")} marcado.` : ""].filter(Boolean).join(" ") + grow;
+  if (msg.trim()) toast(msg.trim());
 }
 function syncHabit(t, done){ // al completar una tarea de un frente, marca el hábito ligado a ese frente
   const d = today(), names = [];
@@ -616,7 +693,8 @@ VIEWS.frentes = function(){
       <div class="front-head"><h2>${esc(f.name)}</h2><button class="more" data-act="front-sheet" data-id="${f.id}" aria-label="Opciones del frente">${ICON.more}</button></div>
       ${(() => { const g = goalFor(f.id), h = S.habits.find(x => x.frontId === f.id);
         const gHtml = g ? (() => { const wk = goalWeek(g), n = goalWeeks(g), cur = (g.weekly || [])[Math.max(0, wk-1)];
-          return `<span class="tmeta">${wk ? `Objetivo · semana ${wk} de ${n}` : `Objetivo · empieza el ${fmtShort(g.start)}`}</span><b>${esc(g.title)}</b>${cur && cur.text ? `<span class="fg-week">${wk ? "Esta semana" : "Primera semana"}: ${esc(cur.text)}</span>` : ""}`; })() : "";
+          const tr = wk && forestOn(g) ? forestStats(g, forestDays(g)).trees : 0;
+          return `<span class="tmeta">${wk ? `Objetivo · semana ${wk} de ${n}${tr ? ` · ${plural(tr, "árbol", "árboles")}` : ""}` : `Objetivo · empieza el ${fmtShort(g.start)}`}</span><b>${esc(g.title)}</b>${cur && cur.text ? `<span class="fg-week">${wk ? "Esta semana" : "Primera semana"}: ${esc(cur.text)}</span>` : ""}`; })() : "";
         const hHtml = h ? `<span class="tmeta fg-habit">Hábito · ${esc(daysLabel(h.days))}${h.minimum ? ` · mínimo ${esc(h.minimum)}` : ""}${h.standard ? ` · estándar ${esc(h.standard)}` : ""}</span>` : "";
         const add = [!g ? `<button class="text-btn muted" data-act="goal-new" data-front="${f.id}">+ Objetivo</button>` : "", !h ? `<button class="text-btn muted" data-act="habit-quick" data-front="${f.id}">+ Hábito</button>` : ""].join("");
         return (g || h ? `<div class="front-goal">${gHtml}${hHtml}</div>` : "") + (add ? `<div class="front-add">${add}</div>` : ""); })()}
@@ -654,6 +732,7 @@ VIEWS.metas = function(){
         <button class="more" data-act="goal-sheet" data-id="${g.id}" aria-label="Opciones">${ICON.more}</button></div>
       <div><div class="bar"><span style="width:${doneN/N*100}%"></span><i style="left:${elapsed}%"></i></div>
         <p class="bar-legend">${join([g.start && today() < g.start ? `Empieza el ${fmtShort(g.start)}` : g.deadline && today() > g.deadline ? (doneN === N ? "Cumplido" : "Plazo vencido") : `Semana ${wk} de ${N}`, `${doneN}/${N} semanas cumplidas`, g.deadline && today() <= g.deadline ? `faltan ${diffDays(today(), g.deadline)} días` : ""])}</p></div>
+      ${forestOn(g) ? forestBlock(g) : ""}
       ${items.length ? `<div class="list">${items.map(w => `<div class="trow ${w.done ? "done" : ""} ${w.i + 1 === wk ? "cur" : ""}">
         <button class="check ${w.done ? "on" : ""}" data-act="goal-week" data-id="${g.id}" data-i="${w.i}" aria-label="Marcar semana ${w.i + 1}">${ICON.check}</button>
         <div class="tmain"><span class="ttitle">${w.text ? esc(w.text) : '<span class="muted">Sin definir</span>'}</span><span class="tmeta">Semana ${w.i + 1}${w.i + 1 === wk ? " · esta semana" : ""}</span></div></div>`).join("")}</div>` : ""}
@@ -726,10 +805,11 @@ const HELP = {
   congelados:["Congelados", ["Proyectos que te interesan pero no son para ahora.", "No se pierden: quedan guardados con sus tareas.", "Toca <b>Activar</b> cuando tengas menos de 2 frentes activos."]],
   metas:["Metas", ["De lo grande a lo pequeño:", "<b>Visión</b>: hacia dónde vas en años.", "<b>Objetivo</b>: lo que logras entre una fecha de inicio y una fecha límite.", "<b>Semanas</b>: lo que debe estar hecho cada domingo.", "Las tareas del día van en Frentes."]],
   vision:["Visión", ["Una o dos frases sobre hacia dónde vas en los próximos años.", "Solo da dirección, no es una tarea."]],
-  objetivos:["Objetivos", ["Un resultado medible con fecha límite, como “Aprobar la CCFA”.", "Las semanas salen solas de tus fechas: 4 semanas si pones un mes, 12 si pones tres.", "Escribe qué debe estar hecho cada semana y márcalo el domingo.", "En <b>Plan</b> quedan tu mínimo, cuándo lo haces y qué podría salir mal.", "La línea naranja de la barra marca el tiempo que ha pasado."]],
+  objetivos:["Objetivos", ["Un resultado medible con fecha límite, como “Aprobar la CCFA”.", "Las semanas salen solas de tus fechas: 4 semanas si pones un mes, 12 si pones tres.", "Escribe qué debe estar hecho cada semana y márcalo el domingo.", "En <b>Plan</b> quedan tu mínimo, cuándo lo haces y qué podría salir mal.", "El <b>bosque</b> crece con cada día que avanzas en el frente.", "La línea naranja de la barra marca el tiempo que ha pasado."]],
   semana:["Semana", ["Arriba ves tus números de la semana.", "El domingo, en 30 minutos, respondes la revisión y defines la meta de la próxima semana."]],
   revision:["Revisión", ["Responde con frases cortas.", "En <b>¿Qué voy a cambiar?</b> cambia el sistema, no a ti: un horario, un mínimo, una regla.", "Marca si cumpliste la semana de cada objetivo y escribe qué debe estar hecho la próxima.", "Después crea en Frentes las tareas de esa semana."]],
-  anteriores:["Anteriores", ["Tus revisiones pasadas, para ver cómo vas."]]
+  anteriores:["Anteriores", ["Tus revisiones pasadas, para ver cómo vas."]],
+  bosque:["Bosque", ["Cada día del objetivo es un espacio de tierra.", "Termina una tarea de este frente o cumple su hábito: crece un <b>árbol</b>.", "Si la Principal del día era de este frente, el árbol da <b>fruto</b>.", "Solo el mínimo: crece un <b>brote</b>. La racha sigue.", "Un día sin nada queda vacío. Lo que ya creció no se pierde."]]
 };
 function helpSheet(k){
   const h = HELP[k]; if (!h) return;
@@ -934,6 +1014,8 @@ function guideSheet(){
     <p>En Frentes toca <b>Crear frente</b>: te guía por tareas → objetivo → hábito. El objetivo y el hábito son opcionales.</p>
     <h3>Cada día</h3>
     <ol><li><b>Durante el día:</b> lo que se te ocurra va a la Bandeja.</li><li><b>Cada noche, 5 min:</b> en Hoy → <b>Planear mañana</b>. Vacías la Bandeja y eliges la principal de mañana y hasta 2 extras.</li><li><b>Al día siguiente:</b> toca ▶ en la principal, trabaja y marca la casilla. El hábito se marca solo.</li><li><b>Día malo:</b> si no terminas la principal, haz el mínimo y toca <b>Solo mínimo</b> en el hábito.</li></ol>
+    <h3>Tu bosque</h3>
+    <p>Cada objetivo con fechas tiene un bosque: un espacio por día. Cada día que avanzas en ese frente crece un árbol. Si era la Principal, da fruto. Si solo hiciste el mínimo, crece un brote.</p>
     <h3>Cada domingo, 30 min</h3>
     <ol><li>En Semana responde las 3 preguntas.</li><li>Marca si cumpliste la semana de cada objetivo y escribe qué debe estar hecho la próxima.</li><li>En Frentes escribe las tareas de esa semana.</li></ol>
     <h3>Reglas</h3>
@@ -1135,13 +1217,13 @@ const A = {
   "pick-do"(d){ if (assign(d.id, d.date, d.slot)) closeModal(); },
   "inbox-done"(d){ const t = task(d.id); if (!t) return; if (t.slot){ toggleDone(d.id); return; } remove("tasks", d.id); toast("Hecho y fuera de la Bandeja."); },
   hlog(d){ const h = S.habits.find(x => x.id === d.id); if (!h) return; const log = {...(h.log || {})}; const day = today();
-    if (log[day] === d.k) delete log[day]; else log[day] = d.k; put("habits", {...h, log});
-    if (log[day]) toast("Mínimo cumplido. La racha sigue viva."); },
+    if (log[day] === d.k) delete log[day]; else log[day] = d.k; const grow = log[day] ? forestGrow(h.frontId, 1) : ""; put("habits", {...h, log});
+    if (log[day]) toast("Mínimo cumplido. La racha sigue viva." + grow); },
   "habits-edit"(){ confirmKey = null; habitsEdit(); },
   "habit-new"(){ habitNew(); },
   "habit-edit"(d){ habitEditOne(d.id); },
   hcheck(d){ const h = S.habits.find(x => x.id === d.id); if (!h) return; const log = {...(h.log || {})}; const day = today();
-    if (log[day] === "min") log[day] = "full"; else if (log[day]) delete log[day]; else log[day] = "full"; put("habits", {...h, log}); if (log[day]) toast("Hábito cumplido."); },
+    if (log[day] === "min") log[day] = "full"; else if (log[day]) delete log[day]; else log[day] = "full"; const grow = log[day] ? forestGrow(h.frontId, 2) : ""; put("habits", {...h, log}); if (log[day]) toast("Hábito cumplido." + grow); },
   help(d){ helpSheet(d.k); },
   vision(){ const st = settings(); openModal(() => sheet("Visión", `<form class="stack" data-form="vision" style="gap:14px"><label class="field" for="v-text">Hacia dónde vas en los próximos años<span class="hint">Una o dos frases. Solo da dirección.</span><textarea class="auto" rows="2" id="v-text" placeholder="Ej: libertad financiera y trabajar de forma independiente">${esc(st.vision || "")}</textarea></label><button class="btn primary block" type="submit">Guardar</button></form>`), false); },
   "habit-del"(d, el){ const k = "hdel-" + d.id;

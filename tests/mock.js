@@ -1,5 +1,6 @@
+// mock.js: db en memoria compatible con lo que usa la app (MEJORAS.md, sección 4)
 (function(){
-  const store = {}, subs = [];
+  const store = Object.assign({}, window.__SEED || {}), subs = []; // __SEED: datos iniciales opcionales para las pruebas
   const notify = () => subs.forEach(f => f());
   const mk = p => ({ id:p.split('/').pop(), exists:!!store[p], data:() => store[p] && JSON.parse(JSON.stringify(store[p])), metadata:{} });
   const db = {

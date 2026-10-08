@@ -1,6 +1,27 @@
 # Ejecución: plan de mejoras para Claude Code
 
-> **Para Claude Code:** este documento es la especificación. Lee primero la sección 1 (contexto y reglas) y luego haz **una tarea a la vez**, en el orden indicado. Después de cada tarea, pruébala (sección 4) y pídeme confirmación antes de seguir con la siguiente.
+> **Para Claude Code:** este documento es la especificación. Lee primero la sección 1 (contexto y reglas) y luego haz **una tarea a la vez**, en el orden de las **fases** (sección 0). Después de cada tarea, pruébala (sección 4) y pídeme confirmación antes de seguir con la siguiente.
+
+---
+
+## 0. Fases
+
+Cada fase termina con la app publicada y usable. No se empieza una fase sin cerrar la anterior.
+
+| Fase | Qué | Tareas | Se cierra cuando |
+|---|---|---|---|
+| **0 · Base** | Repo con historial, pruebas automáticas y el bosque | Tarea 0 | El bosque está publicado en el artifact |
+| **1 · Lo crítico** | Lo que protege tus datos y quita fricción diaria | Tarea 3 → Tarea 1 → Tarea 2 | Tienes una copia descargada y la app no pide nada dos veces |
+| **2 · Usarla** | 4 semanas de uso real, **sin funciones nuevas** (solo arreglar errores) | — | Pasaron 4 domingos con revisión cerrada |
+| **3 · Según el uso** | Solo lo que el uso real pida, en este orden por defecto | Tarea 5 → Tarea 6 → Tarea 4 | Tú decides, con lo anotado en la fase 2 |
+| **4 · Fuera del artifact** | La versión independiente (sección 3) | — | Fuera de alcance por ahora |
+
+**Por qué este orden**
+- La **Tarea 3** va primero en la fase 1: hoy tus datos viven solo en el artifact y no tienen copia. Se hace antes de cambiar cómo se guardan (Tarea 1).
+- En la **fase 2**, todo lo que estorbe se anota en la Bandeja empezando con `App:`. Al final de la fase se revisa esa lista y de ahí sale la fase 3.
+- La **Tarea 5** se reduce: el bosque ya muestra cada día de cada objetivo. Queda el porcentaje de días ganados del mes y la mejor racha de cada hábito.
+- La **Tarea 4** (IA) va al final porque es la más grande y la única que depende de una capability (`sample`) cuya forma exacta hay que verificar antes de escribir código.
+- **Capabilities:** cada publicación que las declare debe repetir **todas** (la regla completa de `db`, más `downloads` desde la Tarea 3 y más `sample` desde la Tarea 4). Si se omite una, se pierde.
 
 ---
 
@@ -65,6 +86,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 - **Modales:** `openModal(fn, live)` (cuando `live=false` no se redibuja con cada cambio y `modal.guard` evita cerrarlo tocando fuera), `sheet()`, `taskSheet`, `pickSheet`, `frontSheet`, `goalForm`, `habitsEdit`, `habitEditOne`, `habitNew`, `habitQuick`, `wizardOpen` (W), `nightOpen`/`nightRender` (NP), `settingsSheet`, `guideSheet`, `helpSheet`.
 - **Eventos:** clics delegados con `data-act` → objeto `A`. Formularios con `data-form` → objeto `FORMS`.
 - **Enfoque:** objeto `F`, `focusOpen`, `renderFocus`, `tick`, `logFocus`.
+- **Bosque:** `forestOn`, `forestMap`, `forestDays`, `forestStats`, `forestSvg`, `forestBlock`, `forestGrow`, `TREES`, `SPROUT`. Se calcula en memoria a partir de `tasks` y `habits`; no tiene colección propia.
 
 ### Reglas al editar
 
@@ -77,7 +99,27 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 
 ---
 
-## 2. Tareas (en orden de prioridad)
+## 2. Tareas
+
+### Tarea 0: Bosque del objetivo *(fase 0 · hecha, falta publicar)*
+
+**Idea:** como la app Forest, pero con el estilo de Ejecución. Cada objetivo con inicio y fecha límite tiene un bosque que empieza vacío y se llena con cada día que avanzas.
+
+**Reglas:**
+- Un espacio de tierra por día, de `start` a `deadline` (máximo 364). Una fila por semana del objetivo (en objetivos largos, 2 a 4 semanas por fila).
+- Lo que se cuenta es del **frente del objetivo**, en ese día:
+  - **Brote:** el hábito del frente quedó en `"min"`.
+  - **Árbol:** se terminó una tarea del frente (`doneAt`) o el hábito quedó en `"full"` o `"auto"`.
+  - **Árbol con fruto** (color `--accent`): la Principal de ese día era de este frente y está hecha.
+- Un día pasado sin nada queda vacío. No hay árboles secos: lo que creció no se pierde.
+- Hoy sin nada muestra una semilla (aro `--accent`). Los días futuros se ven como tierra tenue.
+- Tres árboles geométricos y simétricos (pino, redondo, ciprés), con tokens `--tree`, `--tree-2`, `--trunk` y `--soil` en claro y oscuro.
+
+**Dónde aparece:**
+- **Metas:** en cada objetivo, entre la barra y las semanas, con su "!" (`HELP.bosque`) y el conteo "11 árboles · 2 brotes · 11 por crecer".
+- **Frentes:** en la línea del objetivo, "· 9 árboles".
+- **Avisos:** al marcar una tarea o un hábito: "Creció un árbol en tu bosque.", "Brotó una planta…", "Tu árbol dio fruto.". El árbol de hoy se anima una sola vez la próxima vez que abres Metas.
+- **Guía:** sección "Tu bosque".
 
 ### Tarea 1: Un solo mínimo y un solo estándar *(alta)*
 
@@ -151,6 +193,8 @@ Esto no se hace en el artifact. Queda como referencia para una versión independ
 ---
 
 ## 4. Cómo probar cada cambio
+
+> **Atajo:** `node tests/run.mjs` hace los pasos 2 y 3 (flujos base y casos del bosque, en claro y oscuro) y deja las capturas en `tests/out/`. Cada tarea nueva agrega sus casos a ese archivo.
 
 1. **Revisión de sintaxis:** extrae el `<script>` y corre `node --check`.
 2. **Prueba con almacenamiento simulado:** crea una página de prueba que inyecte, **antes** del HTML de la app, un `window.claude` falso:
