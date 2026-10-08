@@ -55,7 +55,7 @@ for (const scheme of ['light', 'dark']){
   // Metas: el bosque aparece con el árbol de hoy
   await nav(p, 'metas'); await p.waitForTimeout(50);
   ok(await p.locator('.forest').count() === 1, 'Metas muestra el bosque del objetivo');
-  ok(/1 árbol/.test(await p.locator('.forest .count').textContent()), 'el bosque cuenta 1 árbol');
+  ok(/1 árbol/.test(await p.locator('.forest .forest-count').textContent()), 'el bosque cuenta 1 árbol');
   await p.screenshot({ path:path.join(out, `metas-nuevo-${scheme}.png`), fullPage:true });
   // congelar el frente oculta su hábito en Hoy
   await nav(p, 'frentes'); await p.click(`[data-act=front-sheet][data-id="${fid}"]`); await p.click('[data-act=front-freeze]'); await p.waitForTimeout(100);
@@ -65,15 +65,15 @@ for (const scheme of ['light', 'dark']){
 }
 
 // ---------- 2. bosque con historia ----------
-function seedGoal({ start, days, id = 'g1', title = 'Aprobar la CCFA', levels = {} }){
-  const seed = { 'fronts/f1':{ name:'CCFA', status:'active', order:1, created:1 }, 'meta/settings':{}, 'meta/focus':{ days:{} } };
+function seedGoal({ start, days, id = 'g1', title = 'Aprobar la CCFA', levels = {}, habitDays = [0,1,2,3,4,5,6], frontExtra = {} }){
+  const seed = { 'fronts/f1':{ name:'CCFA', status:'active', order:1, created:1, ...frontExtra }, 'meta/settings':{}, 'meta/focus':{ days:{} } };
   const log = {}; let n = 0;
   for (const [d, lv] of Object.entries(levels)){
     if (lv === 1) log[d] = 'min';
     if (lv === 2) log[d] = 'full';
     if (lv === 3){ seed[`tasks/t${n}`] = { title:'Estudiar módulo ' + n, frontId:'f1', minutes:45, slot:'critical', date:d, done:true, doneAt:d, created:n }; log[d] = 'auto'; n++; }
   }
-  seed['habits/h1'] = { name:'CCFA', minimum:'15 min', standard:'45 min', days:[0,1,2,3,4,5,6], frontId:'f1', log, order:1, created:start };
+  seed['habits/h1'] = { name:'CCFA', minimum:'15 min', standard:'45 min', days:habitDays, frontId:'f1', log, order:1, created:start };
   seed[`goals/${id}`] = { frontId:'f1', title, start, deadline:add(start, days - 1), weekly:Array.from({ length:Math.ceil(days / 7) }, (_, i) => ({ text:`Semana ${i + 1} del plan`, done:i < 1 })), premortem:[], created:1 };
   return seed;
 }
@@ -91,11 +91,11 @@ for (const c of CASES){
     const seed = seedGoal({ start:c.start, days:c.days, levels:pattern(c.start, add(TODAY, -1)) });
     const p = await open(scheme, seed); await nav(p, 'metas'); await p.waitForTimeout(80);
     const info = await p.evaluate(() => { const f = document.querySelector('.forest'); if (!f) return null; const svg = f.querySelector('svg'); const r = svg.getBoundingClientRect();
-      return { label:f.querySelector('.count').textContent, cells:svg.querySelectorAll(':scope > g').length, w:r.width, h:r.height }; });
+      return { label:f.querySelector('.forest-count').textContent, cells:+(f.getAttribute('aria-label').match(/en (\d+) días/) || [])[1], w:r.width, h:r.height }; });
     const L = pattern(c.start, add(TODAY, -1)), lastDay = add(c.start, c.days - 1);
     const inRange = Object.entries(L).filter(([d]) => d <= lastDay && d <= TODAY);
     const trees = inRange.filter(([, v]) => v >= 2).length, sprouts = inRange.filter(([, v]) => v === 1).length;
-    if (scheme === 'light') console.log(`\nBosque ${c.name}: ${info && info.label} · ${info && info.cells} celdas · ${info && Math.round(info.w)}×${info && Math.round(info.h)}px`);
+    if (scheme === 'light') console.log(`\nBosque ${c.name}: ${info && info.label} · ${info && info.cells} días · ${info && Math.round(info.w)}×${info && Math.round(info.h)}px`);
     ok(info && info.cells === c.days, `${c.name}/${scheme}: una celda por día (${c.days})`);
     ok(info && info.label.includes(`${trees} ${trees === 1 ? 'árbol' : 'árboles'}`) && (!sprouts || info.label.includes(`${sprouts} brote`)), `${c.name}/${scheme}: cuenta ${trees} árboles y ${sprouts} brotes`);
     ok(await noScroll(p) === 390 && !p.errs.length, `${c.name}/${scheme}: sin scroll ni errores ${p.errs.join('|')}`);
@@ -112,6 +112,45 @@ for (const c of CASES){
     }
     await p.close();
   }
+}
+// ---------- 3. la regla de los dos fallos ----------
+const seq = (start, arr) => Object.fromEntries(arr.map((v, i) => [add(start, i), v]).filter(([, v]) => v));
+console.log('\nRegla de los dos fallos');
+for (const scheme of ['light', 'dark']){
+  // salvado, marchito → seco, y marchito → seco → tierra
+  let start = add(TODAY, -10);
+  let p = await open(scheme, seedGoal({ start, days:28, levels:seq(start, [2,2,0,2,0,0,2,0,0,0]) }));
+  await nav(p, 'metas'); let lb = await p.locator('.forest .forest-count').textContent();
+  ok(lb.includes('4 árboles') && lb.includes('2 marchitos') && lb.includes('2 secos'), `${scheme}: fallar 1 marchita, fallar 2 seca, cumplir salva ("${lb}")`);
+  ok(await p.locator('.forest .bare').count() === 1, `${scheme}: desde el tercer fallo queda tierra`);
+  ok(await p.locator('.forest .today').count() === 1, `${scheme}: se marca el espacio de hoy`);
+  await p.locator('.goal').first().screenshot({ path:path.join(out, `bosque-fallos-${scheme}.png`) }); await p.close();
+  // ayer se marchitó: aviso en Hoy y hoy lo salvas
+  start = add(TODAY, -5);
+  p = await open(scheme, seedGoal({ start, days:28, levels:seq(start, [2,2,2,2,0]) }));
+  const hoy = await p.locator('.notices').textContent().catch(() => '');
+  ok(/Tu árbol de CCFA se está marchitando/.test(hoy) && !/La última vez no cumpliste/.test(hoy), `${scheme}: Hoy avisa que el árbol se marchita (sin repetir el aviso del hábito)`);
+  await p.screenshot({ path:path.join(out, `hoy-marchito-${scheme}.png`) });
+  await p.click('[data-act=hcheck]'); const tt = await toastText(p);
+  ok(/Creció un árbol.*Salvaste el que se marchitaba/.test(tt), `${scheme}: al cumplir hoy se salva ("${tt}")`);
+  await nav(p, 'metas'); lb = await p.locator('.forest .forest-count').textContent();
+  ok(!lb.includes('marchito') && lb.includes('5 árboles'), `${scheme}: el marchito pasa a salvado ("${lb}")`);
+  ok(await p.locator('.forest .grow').count() === 0, `${scheme}: primera vista en Metas sin animación`);
+  ok(!p.errs.length && await noScroll(p) === 390, `${scheme}: sin errores ni scroll`); await p.close();
+  // fines de semana sin hábito: no castigan
+  start = '2026-09-28'; const L = {}; for (let d = start; d < TODAY; d = add(d, 1)){ const w = new Date(d + 'T12:00:00Z').getUTCDay(); if (w >= 1 && w <= 5) L[d] = 2; }
+  p = await open(scheme, seedGoal({ start, days:28, levels:L, habitDays:[1,2,3,4,5] }));
+  await nav(p, 'metas'); lb = await p.locator('.forest .forest-count').textContent();
+  ok(!/marchito|seco/.test(lb) && lb.includes(`${Object.keys(L).length} árboles`), `${scheme}: los días que no tocan quedan en pasto ("${lb}")`); await p.close();
+  // frente congelado hace 6 días: esos días no cuentan
+  start = add(TODAY, -12);
+  p = await open(scheme, seedGoal({ start, days:28, levels:seq(start, [2,2,2,2,2,2]), frontExtra:{ status:'frozen', pauses:[{ from:add(TODAY, -6) }] } }));
+  await nav(p, 'metas'); lb = await p.locator('.forest .forest-count').textContent();
+  ok(!/marchito|seco/.test(lb), `${scheme}: con el frente congelado no se marchita nada ("${lb}")`);
+  // y al activarlo se cierra la pausa
+  await nav(p, 'frentes'); await p.click('[data-act=front-activate]'); await p.waitForTimeout(80);
+  const fr = (await store(p)).fronts[0]; ok(fr.status === 'active' && fr.pauses[0].to === TODAY, `${scheme}: activar cierra la pausa`);
+  await p.close();
 }
 // escritorio
 { const p = await open('light', seedGoal({ start:add(TODAY, -16), days:28, levels:pattern(add(TODAY, -16), add(TODAY, -1)) }), 1280);

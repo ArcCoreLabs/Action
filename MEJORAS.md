@@ -59,7 +59,8 @@ Cada fase termina con la app publicada y usable. No se empieza una fase sin cerr
 Las colecciones viven en la raíz. Se escribe con `put(col, obj)` (reemplazo completo, con una cola por documento) y se borra con `remove(col, id)`. Para leer, hay suscripciones `onSnapshot` que llenan el objeto `S`.
 
 ```
-fronts/{id}   { name, note, status: "active"|"frozen", order, created }
+fronts/{id}   { name, note, status: "active"|"frozen", order, created,
+                pauses: [{from:"YYYY-MM-DD", to?:"YYYY-MM-DD"}] }   // periodos congelado; el bosque no cuenta fallos ahí
 tasks/{id}    { title, frontId|null, minutes|null, slot: null|"critical"|"secondary",
                 date: "YYYY-MM-DD"|null, done, doneAt, created, archived? }
 goals/{id}    { frontId, title, why, start, deadline, standard, minimum, trigger,
@@ -86,7 +87,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 - **Modales:** `openModal(fn, live)` (cuando `live=false` no se redibuja con cada cambio y `modal.guard` evita cerrarlo tocando fuera), `sheet()`, `taskSheet`, `pickSheet`, `frontSheet`, `goalForm`, `habitsEdit`, `habitEditOne`, `habitNew`, `habitQuick`, `wizardOpen` (W), `nightOpen`/`nightRender` (NP), `settingsSheet`, `guideSheet`, `helpSheet`.
 - **Eventos:** clics delegados con `data-act` → objeto `A`. Formularios con `data-form` → objeto `FORMS`.
 - **Enfoque:** objeto `F`, `focusOpen`, `renderFocus`, `tick`, `logFocus`.
-- **Bosque:** `forestOn`, `forestMap`, `forestDays`, `forestStats`, `forestSvg`, `forestBlock`, `forestGrow`, `TREES`, `SPROUT`. Se calcula en memoria a partir de `tasks` y `habits`; no tiene colección propia.
+- **Bosque:** `forestOn`, `paused`, `forestMap` (nivel por día), `forestDays` (estado por día), `forestGoal`, `forestWilting`, `forestGrow` (texto del aviso), `forestArt`, `forestSvg` (la isla), `forestStats`, `forestBlock`, `TREES`, `ART`. Se calcula en memoria a partir de `tasks`, `habits` y `fronts.pauses`; no tiene colección propia.
 
 ### Reglas al editar
 
@@ -103,22 +104,31 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 
 ### Tarea 0: Bosque del objetivo *(fase 0 · hecha, falta publicar)*
 
-**Idea:** como la app Forest, pero con el estilo de Ejecución. Cada objetivo con inicio y fecha límite tiene un bosque que empieza vacío y se llena con cada día que avanzas.
+**Idea:** como la app Forest (una isla de pasto en perspectiva), con los colores y la letra de Ejecución. Cada objetivo con inicio y fecha límite tiene su isla: empieza vacía y se llena con cada día que avanzas. Aplica la regla *nunca fallar dos veces seguidas*.
 
-**Reglas:**
-- Un espacio de tierra por día, de `start` a `deadline` (máximo 364). Una fila por semana del objetivo (en objetivos largos, 2 a 4 semanas por fila).
-- Lo que se cuenta es del **frente del objetivo**, en ese día:
-  - **Brote:** el hábito del frente quedó en `"min"`.
-  - **Árbol:** se terminó una tarea del frente (`doneAt`) o el hábito quedó en `"full"` o `"auto"`.
-  - **Árbol con fruto** (color `--accent`): la Principal de ese día era de este frente y está hecha.
-- Un día pasado sin nada queda vacío. No hay árboles secos: lo que creció no se pierde.
-- Hoy sin nada muestra una semilla (aro `--accent`). Los días futuros se ven como tierra tenue.
-- Tres árboles geométricos y simétricos (pino, redondo, ciprés), con tokens `--tree`, `--tree-2`, `--trunk` y `--soil` en claro y oscuro.
+**Estado de cada día** (se mira solo el **frente del objetivo**):
+
+| Estado | Cuándo |
+|---|---|
+| **Brote** | El hábito del frente quedó en `"min"` |
+| **Árbol** | Se terminó una tarea del frente (`doneAt`) o el hábito quedó en `"full"` o `"auto"` |
+| **Árbol con fruto** (`--accent`) | La Principal de ese día era de este frente y está hecha |
+| **Marchito** | Un día que tocaba (hábito programado o Principal del frente) sin nada |
+| **Salvado** (árbol pequeño) | Era marchito y se cumplió el siguiente día que tocaba |
+| **Seco** (tronco caído) | Segundo fallo seguido |
+| **Tierra** | Tercer fallo seguido en adelante |
+| **Pasto** | Un día que no tocaba, o con el frente congelado (`pauses`) |
+| **Hoy** | Rombo `--accent` y una semilla hasta que cumplas |
+
+- Los días que no tocan no cortan ni reinician la cuenta de fallos.
+- Isla cuadrada (lado = raíz del número de días, mínimo 3), un espacio por día (máximo 364), llenada desde el fondo hacia el frente.
+- Tres árboles geométricos (pino, redondo, ciprés), con luz desde la izquierda. Tokens: `--grass`, `--grass-2`, `--grass-side`, `--earth`, `--earth-2`, `--tree`, `--tree-2`, `--trunk`, `--wilt`, `--dead`, `--hi`, `--shade`, en claro y oscuro.
 
 **Dónde aparece:**
-- **Metas:** en cada objetivo, entre la barra y las semanas, con su "!" (`HELP.bosque`) y el conteo "11 árboles · 2 brotes · 11 por crecer".
+- **Metas:** en cada objetivo, entre la barra y las semanas, con su "!" (`HELP.bosque`) y debajo el conteo "11 árboles · 2 brotes · 1 marchito · 11 por crecer".
 - **Frentes:** en la línea del objetivo, "· 9 árboles".
-- **Avisos:** al marcar una tarea o un hábito: "Creció un árbol en tu bosque.", "Brotó una planta…", "Tu árbol dio fruto.". El árbol de hoy se anima una sola vez la próxima vez que abres Metas.
+- **Hoy:** si hay un árbol marchito por salvar: "Tu árbol de CCFA se está marchitando. Hoy haz al menos el mínimo y lo salvas." (reemplaza el aviso del hábito de ese frente).
+- **Avisos al marcar:** "Creció un árbol en tu bosque.", "Brotó una planta…", "Tu árbol dio fruto.", "Salvaste el que se marchitaba.". El árbol de hoy se anima una vez la próxima vez que abres Metas.
 - **Guía:** sección "Tu bosque".
 
 ### Tarea 1: Un solo mínimo y un solo estándar *(alta)*

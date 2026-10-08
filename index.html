@@ -8,7 +8,8 @@
   --bg:#FAFAF9; --surface:#FFFFFF; --sunken:#F1F1EF; --ink:#16171A; --muted:#7C7F87; --faint:#B4B6BC; --line:#E9E9E6;
   --accent:#E2541B; --accent-ink:#FFFFFF; --accent-soft:#FCEBE3;
   --ok:#2F8A4E; --ok-soft:#E3F2E8; --warn:#C2362B;
-  --tree:#2F8A4E; --tree-2:#7DB88F; --trunk:#A08670; --soil:#E4E3DE;
+  --grass:#CFE6B0; --grass-2:#C4DEA2; --grass-side:#A3CA7B; --earth:#C49A6C; --earth-2:#AB8259;
+  --tree:#3F9A55; --tree-2:#6DB46F; --trunk:#9A6E4C; --wilt:#D4B157; --dead:#A89786; --hi:rgba(255,255,255,.3); --shade:rgba(0,0,0,.1);
   --p1:var(--accent); --ticket-line:var(--line);
   --f-sans:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
@@ -17,12 +18,14 @@
   --bg:#111113; --surface:#18181B; --sunken:#1E1E22; --ink:#EDEDEF; --muted:#8B8C94; --faint:#55565D; --line:#26262B;
   --accent:#FF7A3D; --accent-ink:#111113; --accent-soft:#33211A;
   --ok:#5CC27F; --ok-soft:#18291F; --warn:#FF7468;
-  --tree:#5CC27F; --tree-2:#3C8A57; --trunk:#6E5E52; --soil:#2A2A2F; color-scheme:dark}}
+  --grass:#33502E; --grass-2:#2D4829; --grass-side:#284224; --earth:#5E4532; --earth-2:#4D3828;
+  --tree:#58B86E; --tree-2:#3F955A; --trunk:#7D5E46; --wilt:#B8973E; --dead:#857668; --hi:rgba(255,255,255,.16); --shade:rgba(0,0,0,.28); color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#111113; --surface:#18181B; --sunken:#1E1E22; --ink:#EDEDEF; --muted:#8B8C94; --faint:#55565D; --line:#26262B;
   --accent:#FF7A3D; --accent-ink:#111113; --accent-soft:#33211A;
   --ok:#5CC27F; --ok-soft:#18291F; --warn:#FF7468;
-  --tree:#5CC27F; --tree-2:#3C8A57; --trunk:#6E5E52; --soil:#2A2A2F; color-scheme:dark}
+  --grass:#33502E; --grass-2:#2D4829; --grass-side:#284224; --earth:#5E4532; --earth-2:#4D3828;
+  --tree:#58B86E; --tree-2:#3F955A; --trunk:#7D5E46; --wilt:#B8973E; --dead:#857668; --hi:rgba(255,255,255,.16); --shade:rgba(0,0,0,.28); color-scheme:dark}
 
 *{box-sizing:border-box}
 html,body{background:var(--bg);color:var(--ink)}
@@ -108,6 +111,7 @@ label.field .hint{font-weight:500;color:var(--muted);font-size:12.5px}
 .notice::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--faint);flex:none;transform:translateY(-2px)}
 .notice.acc::before{background:var(--accent)}
 .notice.warn::before{background:var(--warn)}
+.notice>span{flex:1 1 200px;min-width:0}
 .notice b{color:var(--ink);font-weight:600}
 .notice .text-btn{padding:0;font-size:13px}
 .ticket{border-radius:14px;padding:16px;background:var(--surface);display:grid;gap:6px}
@@ -315,18 +319,18 @@ input.box:checked::after{content:"";width:10px;height:6px;border-left:2.4px soli
 ul.help{margin:0;padding-left:20px;display:grid;gap:8px;font-size:15px;line-height:1.5}
 ul.help li::marker{color:var(--faint)}
 .dots{max-width:none}
-/* ---------- bosque: un espacio por día del objetivo ---------- */
+/* ---------- bosque: una isla con un espacio por día del objetivo ---------- */
 .forest{display:grid;gap:4px}
 .sec-head h3{font-size:14px;font-weight:700;letter-spacing:-.01em}
-.forest svg{display:block;width:100%;height:auto;margin:0 auto}
-.forest .soil{fill:var(--soil)}
-.forest .future .soil{opacity:.5}
-.forest .seed{fill:none;stroke:var(--accent);stroke-width:.45}
-.forest .lf{fill:var(--tree)}
-.forest .lf2{fill:var(--tree-2)}
-.forest .tk{fill:var(--trunk)}
-.forest .stem{fill:none;stroke:var(--tree);stroke-width:.5;stroke-linecap:round}
+.forest svg{display:block;width:100%;height:auto;margin:4px auto 0}
+.forest .gr{fill:var(--grass)} .forest .gr2{fill:var(--grass-2)} .forest .grs{fill:var(--grass-side)}
+.forest .ea{fill:var(--earth)} .forest .ea2{fill:var(--earth-2)} .forest .bare{fill:var(--earth);opacity:.55}
+.forest .lf{fill:var(--tree)} .forest .lf2{fill:var(--tree-2)} .forest .tk{fill:var(--trunk)}
+.forest .wl{fill:var(--wilt)} .forest .dd{fill:var(--dead)} .forest .hi{fill:var(--hi)} .forest .sh{fill:var(--shade)}
+.forest .stem{fill:none;stroke:var(--tree);stroke-width:.8;stroke-linecap:round}
 .forest .fruit{fill:var(--accent)}
+.forest-count{font-size:12.5px;color:var(--muted);text-align:center;margin-top:-2px}
+.forest .today{fill:none;stroke:var(--accent);stroke-width:.7}
 .forest .grow{transform-box:fill-box;transform-origin:50% 100%;animation:grow .8s cubic-bezier(.2,.8,.3,1.15) both}
 @keyframes grow{from{transform:scale(.15);opacity:0}}
 </style>
@@ -469,9 +473,12 @@ function goalWeek(g){ // 0 = aún no empieza
 }
 
 /* ================= bosque ================= */
-// Cada día entre el inicio y la fecha límite es un espacio de tierra. Lo que hagas ese día en el frente del objetivo lo llena:
-// 1 brote (solo el mínimo del hábito) · 2 árbol (una tarea del frente o el hábito completo) · 3 árbol con fruto (la Principal era de este frente)
+// Cada objetivo con fechas es una isla con un espacio por día. Lo que hagas ese día en su frente lo llena:
+// brote (solo el mínimo) · árbol (una tarea del frente o el hábito completo) · árbol con fruto (la Principal era de este frente).
+// Un día que tocaba y no hiciste nada: el árbol se marchita; si cumples el siguiente día que toca, lo salvas.
+// Dos fallos seguidos: cae seco. Desde el tercero solo queda tierra. Los días que no tocan quedan en pasto.
 const forestOn = g => !!(g && g.frontId && g.start && g.deadline && g.deadline >= g.start);
+const paused = (f, d) => !!f && ((f.pauses || []).some(p => p.from <= d && (!p.to || d < p.to)) || (f.status !== "active" && !(f.pauses || []).length));
 function forestMap(g){
   const lvl = {}, up = (d, v) => { if (d && v > (lvl[d] || 0)) lvl[d] = v; };
   S.tasks.forEach(t => { if (t.frontId !== g.frontId || !t.done) return; up(t.doneAt, 2); if (t.slot === "critical") up(t.date, 3); });
@@ -479,52 +486,88 @@ function forestMap(g){
   return lvl;
 }
 function forestDays(g){
-  const lvl = forestMap(g), n = Math.min(diffDays(g.start, g.deadline) + 1, 52 * 7);
-  return Array.from({length:n}, (_, i) => { const d = addDays(g.start, i); return {d, i, lvl:lvl[d] || 0}; });
+  const lvl = forestMap(g), t = today(), n = Math.min(diffDays(g.start, g.deadline) + 1, 52 * 7), f = front(g.frontId);
+  const hs = S.habits.filter(h => h.frontId === g.frontId);
+  const due = d => { if (paused(f, d)) return false; const c = crit(d); return (c && c.frontId === g.frontId) || hs.some(h => (h.days || []).includes(dow(d)) && (!h.created || d >= h.created)); };
+  const days = []; let miss = 0, wilted = null;
+  for (let i = 0; i < n; i++){
+    const d = addDays(g.start, i), x = {d, i, lvl:lvl[d] || 0, state:"rest"};
+    if (d > t) x.state = "future";
+    else if (x.lvl){ x.state = ["", "sprout", "tree", "fruit"][x.lvl]; if (wilted && miss === 1) wilted.state = "saved"; miss = 0; wilted = null; }
+    else if (d === t) x.state = "seed";
+    else if (due(d)){ miss++; x.state = miss === 1 ? "wilt" : miss === 2 ? "dry" : "bare"; if (miss === 1) wilted = x; }
+    days.push(x);
+  }
+  return days;
 }
-function forestGrow(fid, to){ // texto para el aviso si hoy crece algo en el bosque del frente (se calcula antes de guardar)
-  const d = today(), g = fid && S.goals.find(x => x.frontId === fid && forestOn(x) && x.start <= d && d <= x.deadline);
-  if (!g) return "";
-  const from = forestMap(g)[d] || 0;
+function forestGoal(fid){ const d = today(); return fid ? S.goals.find(g => g.frontId === fid && forestOn(g) && g.start <= d && d <= g.deadline) : null; }
+function forestWilting(g){ // ¿hay un árbol marchito esperando que lo salves hoy?
+  const days = forestDays(g), t = today(), x = days.find(y => y.d === t);
+  const prev = days.filter(y => y.d < t && y.state !== "rest").pop();
+  return !!(x && !x.lvl && prev && prev.state === "wilt");
+}
+function forestGrow(fid, to){ // texto para el aviso si hoy crece algo (se calcula antes de guardar)
+  const g = forestGoal(fid); if (!g) return "";
+  const t = today(), from = forestMap(g)[t] || 0, save = !from && forestWilting(g);
   if (to <= from) return "";
-  if (!from) return to === 1 ? " Brotó una planta en tu bosque." : " Creció un árbol en tu bosque.";
-  return to === 3 ? " Tu árbol dio fruto." : " El brote ya es un árbol.";
+  const msg = !from ? (to === 1 ? " Brotó una planta en tu bosque." : " Creció un árbol en tu bosque.") : to === 3 ? " Tu árbol dio fruto." : " El brote ya es un árbol.";
+  return msg + (save ? " Salvaste el que se marchitaba." : "");
 }
-const TREES = [ // variantes geométricas y simétricas en una celda de 10×12; el suelo está en y=11
-  {body:'<rect class="tk" x="4.55" y="8.8" width=".9" height="2.2" rx=".3"/><path class="lf" d="M5 2.7L7.9 6.9H2.1z"/><path class="lf" d="M5 4.7L8.6 9.3H1.4z"/>',
-   fruit:'<circle class="fruit" cx="5" cy="2.6" r=".75"/>'},
-  {body:'<rect class="tk" x="4.55" y="7.2" width=".9" height="3.8" rx=".3"/><circle class="lf2" cx="5" cy="5.6" r="2.9"/>',
-   fruit:'<circle class="fruit" cx="3.9" cy="4.9" r=".5"/><circle class="fruit" cx="6.2" cy="5.5" r=".5"/><circle class="fruit" cx="4.9" cy="7" r=".5"/>'},
-  {body:'<rect class="tk" x="4.55" y="8.6" width=".9" height="2.4" rx=".3"/><ellipse class="lf" cx="5" cy="5.9" rx="2" ry="3.5"/>',
-   fruit:'<circle class="fruit" cx="4.3" cy="4.7" r=".48"/><circle class="fruit" cx="5.8" cy="6.6" r=".48"/>'}
+// Piezas en coordenadas locales: (0,0) es el centro del espacio en el suelo; la isla usa espacios de 20×10.
+const TREES = [
+  {body:'<rect class="tk" x="-.9" y="-3.6" width="1.8" height="3.8" rx=".5"/><path class="lf" d="M0-12.4L6.4-3.2H-6.4z"/><path class="sh" d="M0-12.4L6.4-3.2H0z"/><path class="lf" d="M0-15.8L5.2-7.6H-5.2z"/><path class="sh" d="M0-15.8L5.2-7.6H0z"/><path class="lf" d="M0-19.2L3.8-11.6H-3.8z"/><path class="sh" d="M0-19.2L3.8-11.6H0z"/>',
+   fruit:'<circle class="fruit" cx="-2.6" cy="-5" r="1.1"/><circle class="fruit" cx="2.4" cy="-9.6" r="1.1"/><circle class="fruit" cx="0" cy="-19" r="1.2"/>'},
+  {body:'<rect class="tk" x="-1" y="-6" width="2" height="6.2" rx=".6"/><circle class="lf2" cx="0" cy="-11" r="6.2"/><path class="sh" d="M0-4.8A6.2 6.2 0 0 0 6.2-11A6.2 6.2 0 0 0 0-17.2A4.6 6.2 0 0 1 0-4.8z"/><circle class="hi" cx="-2.2" cy="-13.4" r="2.4"/>',
+   fruit:'<circle class="fruit" cx="-3.2" cy="-9.6" r="1.1"/><circle class="fruit" cx="3" cy="-12.4" r="1.1"/><circle class="fruit" cx=".6" cy="-7.2" r="1.1"/>'},
+  {body:'<rect class="tk" x="-.9" y="-4" width="1.8" height="4.2" rx=".5"/><ellipse class="lf" cx="0" cy="-11.6" rx="4.1" ry="8.2"/><path class="sh" d="M0-3.4A4.1 8.2 0 0 0 0-19.8A2.4 8.2 0 0 1 0-3.4z"/><ellipse class="hi" cx="-1.5" cy="-14.2" rx="1.3" ry="3.4"/>',
+   fruit:'<circle class="fruit" cx="-1.6" cy="-8.6" r="1"/><circle class="fruit" cx="1.8" cy="-13" r="1"/><circle class="fruit" cx="0" cy="-17.6" r="1"/>'}
 ];
-const SPROUT = '<path class="stem" d="M5 11V8.5"/><ellipse class="lf2" cx="3.95" cy="8.35" rx="1.2" ry=".58" transform="rotate(-28 3.95 8.35)"/><ellipse class="lf2" cx="6.05" cy="8.35" rx="1.2" ry=".58" transform="rotate(28 6.05 8.35)"/>';
-const forestSeen = {}; // nivel de hoy en el último dibujo, para animar solo lo que acaba de crecer
+const ART = {
+  sprout:'<path class="stem" d="M0 0V-4.2"/><ellipse class="lf2" cx="-1.8" cy="-4.5" rx="2.1" ry="1" transform="rotate(-25 -1.8 -4.5)"/><ellipse class="lf2" cx="1.8" cy="-4.5" rx="2.1" ry="1" transform="rotate(25 1.8 -4.5)"/>',
+  wilt:'<rect class="tk" x="-1" y="-5.4" width="2" height="5.6" rx=".6" transform="rotate(6)"/><ellipse class="wl" cx="1.4" cy="-9.4" rx="5.4" ry="4.4" transform="rotate(16 1.4 -9.4)"/><path class="sh" d="M1.4-5A5.4 4.4 0 0 0 6.6-8.2L1.4-9.4z" transform="rotate(16 1.4 -9.4)"/><ellipse class="wl" cx="4.6" cy=".2" rx="1.1" ry=".5"/><ellipse class="wl" cx="-3.6" cy=".6" rx="1" ry=".45"/>',
+  dry:'<rect class="dd" x="-1.3" y="-3.4" width="2.6" height="3.6" rx=".6"/><ellipse class="sh" cx="0" cy="-3.3" rx="1.3" ry=".55"/><g transform="rotate(26.6)"><rect class="dd" x="1.6" y="-2.6" width="11.5" height="3" rx="1.5"/><path class="sh" d="M1.6-.8h11.5v.7a1.5 1.5 0 0 1-1.5 1.5H3.1a1.5 1.5 0 0 1-1.5-1.5z"/><path class="dd" d="M5.4-2.3L6.8-5.6L7.7-5.2L6.9-2.3z"/><path class="dd" d="M9.6-2.3L11.4-4.4L12-3.8L10.6-2.3z"/></g>',
+  bare:'<ellipse class="bare" cx="0" cy="0" rx="4.6" ry="2.2"/>',
+  seed:'<circle class="tk" cx="0" cy="-.6" r=".9"/>'
+};
+const forestSeen = {}; // estado de hoy en el último dibujo, para animar solo lo que acaba de crecer
+const RANK = {seed:0, rest:0, sprout:1, tree:2, fruit:3};
+function forestArt(x){
+  const v = (x.i * 7 + Math.floor(x.i / 5) * 3) % 3;
+  if (x.state === "tree" || x.state === "fruit") return TREES[v].body + (x.state === "fruit" ? TREES[v].fruit : "");
+  if (x.state === "saved") return `<g transform="scale(.7)">${TREES[1].body}</g>`;
+  return ART[x.state] || "";
+}
 function forestSvg(g, days){
-  const t = today(), weeks = Math.ceil(days.length / 7);
-  const k = weeks <= 5 ? 1 : weeks <= 12 ? 2 : weeks <= 24 ? 3 : 4, cols = 7 * k, rows = Math.ceil(days.length / cols);
-  const cells = days.map(x => {
-    const v = (x.i * 5 + Math.floor(x.i / 7) * 2) % 3, cls = x.d > t ? "future" : "";
-    let art = "";
-    if (x.d <= t && x.lvl === 1) art = SPROUT;
-    else if (x.d <= t && x.lvl >= 2) art = TREES[v].body + (x.lvl === 3 ? TREES[v].fruit : "");
-    else if (x.d === t) art = '<circle class="seed" cx="5" cy="10" r=".85"/>';
+  const W = 20, H = 10, T = 5, B = 1.4, side = Math.max(3, Math.ceil(Math.sqrt(days.length))), t = today();
+  const at = i => { const c = i % side, r = Math.floor(i / side); return {c, r, x:(c - r) * W / 2, y:(c + r) * H / 2}; };
+  const L = -side * W / 2, R = side * W / 2, M = side * H / 2, D = side * H;
+  const dia = (x, y, cls) => `<path class="${cls}" d="M${x} ${y}l${W/2} ${H/2}l${-W/2} ${H/2}l${-W/2} ${-H/2}z"/>`;
+  let ground = `<path class="ea" d="M${L} ${M}L0 ${D}v${T}L${L} ${M + T}z"/><path class="ea2" d="M0 ${D}L${R} ${M}v${T}L0 ${D + T}z"/>`
+    + `<path class="grs" d="M${L} ${M}L0 ${D}v${B}L${L} ${M + B}z"/><path class="grs" d="M0 ${D}L${R} ${M}v${B}L0 ${D + B}z" style="opacity:.8"/>`
+    + `<path class="gr" d="M0 0L${R} ${M}L0 ${D}L${L} ${M}z"/>`;
+  for (let i = 0; i < side * side; i++){ const p = at(i); if ((p.c + p.r) % 2) ground += dia(p.x, p.y, "gr2"); }
+  const items = days.map(x => ({x, p:at(x.i)})).sort((a, b) => (a.p.c + a.p.r) - (b.p.c + b.p.r) || a.p.c - b.p.c);
+  const objs = items.map(({x, p}) => {
+    const cx = p.x, cy = p.y + H / 2, art = forestArt(x);
     let grow = "";
-    if (x.d === t){ const prev = forestSeen[g.id]; forestSeen[g.id] = x.lvl; if (prev !== undefined && x.lvl > prev) grow = ' class="grow"'; }
-    return `<g class="${cls}" transform="translate(${(x.i % cols) * 10} ${Math.floor(x.i / cols) * 12})"><ellipse class="soil" cx="5" cy="11" rx="3.4" ry=".75"/>${art ? `<g${grow}>${art}</g>` : ""}</g>`;
+    if (x.d === t){ const lv = RANK[x.state] || 0, prev = forestSeen[g.id]; forestSeen[g.id] = lv; if (prev !== undefined && lv > prev) grow = ' class="grow"'; }
+    const mark = x.d === t ? dia(p.x, p.y, "today") : "";
+    const shadow = /tree|fruit|saved|wilt/.test(x.state) ? `<ellipse class="sh" cx="1.6" cy=".6" rx="${x.state === "saved" ? 3.6 : 5}" ry="${x.state === "saved" ? 1.6 : 2.2}"/>` : "";
+    return mark + (art ? `<g transform="translate(${cx} ${cy}) scale(.84)">${shadow}<g${grow}>${art}</g></g>` : "");
   }).join("");
-  return `<svg viewBox="0 0 ${cols * 10} ${rows * 12}" style="max-width:${cols * 44}px" aria-hidden="true">${cells}</svg>`;
+  const px = Math.min(380, side * (side <= 4 ? 64 : 46));
+  return `<svg viewBox="${L - 2} -18.5 ${side * W + 4} ${D + T + 21.5}" style="max-width:${px}px" aria-hidden="true">${ground}${objs}</svg>`;
 }
 function forestStats(g, days){
-  const t = today(), past = days.filter(x => x.d <= t);
-  return { trees:past.filter(x => x.lvl >= 2).length, sprouts:past.filter(x => x.lvl === 1).length, left:days.length - past.length, total:days.length };
+  const c = k => days.filter(x => k.includes(x.state)).length;
+  return { trees:c(["tree", "fruit"]), sprouts:c(["sprout"]), wilt:c(["wilt"]), dry:c(["dry"]), left:c(["future"]), total:days.length };
 }
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 function forestBlock(g){
   const days = forestDays(g), st = forestStats(g, days);
-  const label = join([plural(st.trees, "árbol", "árboles"), st.sprouts ? plural(st.sprouts, "brote", "brotes") : "", st.left ? `${st.left} por crecer` : ""]);
-  return `<div class="forest" role="img" aria-label="Bosque: ${st.trees} árboles y ${st.sprouts} brotes en ${st.total} días">
-    <div class="sec-head" style="margin-bottom:2px"><h3>Bosque</h3><span class="count">${label}</span>${info("bosque")}</div>${forestSvg(g, days)}</div>`;
+  const label = join([plural(st.trees, "árbol", "árboles"), st.sprouts ? plural(st.sprouts, "brote", "brotes") : "", st.wilt ? plural(st.wilt, "marchito", "marchitos") : "", st.dry ? plural(st.dry, "seco", "secos") : "", st.left ? `${st.left} por crecer` : ""]);
+  return `<div class="forest" role="img" aria-label="Bosque: ${plural(st.trees, "árbol", "árboles")}, ${plural(st.sprouts, "brote", "brotes")}, ${plural(st.wilt, "marchito", "marchitos")} y ${plural(st.dry, "seco", "secos")} en ${st.total} días">
+    <div class="sec-head" style="margin-bottom:0"><h3>Bosque</h3>${info("bosque")}</div>${forestSvg(g, days)}<p class="forest-count">${label}</p></div>`;
 }
 
 /* ================= asignar tareas ================= */
@@ -629,9 +672,11 @@ VIEWS.hoy = function(){
   const nt = [];
   const names = list => list.map(h => esc(h.name)).join(" y ");
   const pend = hs.filter(h => scheduled(h, d) && !(h.log || {})[d]);
-  const alarm = pend.filter(h => missedRun(h) >= 2), once = pend.filter(h => missedRun(h) === 1);
+  const wilting = active().map(f => forestGoal(f.id)).filter(g => g && forestWilting(g));
+  const alarm = pend.filter(h => missedRun(h) >= 2), once = pend.filter(h => missedRun(h) === 1 && !wilting.some(g => g.frontId === h.frontId));
   if (alarm.length) nt.push(`<p class="notice warn"><span>Llevas 2 días sin cumplir <b>${names(alarm)}</b>. Hoy haz al menos el mínimo.</span></p>`);
   else if (once.length) nt.push(`<p class="notice acc"><span>La última vez no cumpliste <b>${names(once)}</b>. Hoy no falles: haz al menos el mínimo.</span></p>`);
+  if (!alarm.length) wilting.forEach(g => nt.push(`<p class="notice acc"><span>Tu árbol de <b>${esc(front(g.frontId).name)}</b> se está marchitando. Hoy haz al menos el mínimo y lo salvas.</span></p>`));
   S.tasks.filter(t => t.slot && t.date && t.date < d && !t.done).forEach(t => nt.push(`<p class="notice"><span>Pendiente: <b>${esc(t.title)}</b></span><button class="text-btn" data-act="carry" data-id="${t.id}">Pasar a hoy</button><button class="text-btn muted" data-act="unassign" data-id="${t.id}">Quitar</button></p>`));
   if (dow(d) === 0 && !(S.reviews.find(r => r.id === monday(d)) || {}).closed) nt.unshift(`<p class="notice acc"><span>Hoy toca la revisión semanal.</span><button class="text-btn" data-act="nav" data-v="semana">Abrir</button></p>`);
 
@@ -809,7 +854,7 @@ const HELP = {
   semana:["Semana", ["Arriba ves tus números de la semana.", "El domingo, en 30 minutos, respondes la revisión y defines la meta de la próxima semana."]],
   revision:["Revisión", ["Responde con frases cortas.", "En <b>¿Qué voy a cambiar?</b> cambia el sistema, no a ti: un horario, un mínimo, una regla.", "Marca si cumpliste la semana de cada objetivo y escribe qué debe estar hecho la próxima.", "Después crea en Frentes las tareas de esa semana."]],
   anteriores:["Anteriores", ["Tus revisiones pasadas, para ver cómo vas."]],
-  bosque:["Bosque", ["Cada día del objetivo es un espacio de tierra.", "Termina una tarea de este frente o cumple su hábito: crece un <b>árbol</b>.", "Si la Principal del día era de este frente, el árbol da <b>fruto</b>.", "Solo el mínimo: crece un <b>brote</b>. La racha sigue.", "Un día sin nada queda vacío. Lo que ya creció no se pierde."]]
+  bosque:["Bosque", ["Cada día del objetivo es un espacio de tu isla.", "Avanza en este frente y crece un <b>árbol</b>. Si era la Principal, da <b>fruto</b>. Si solo hiciste el mínimo, un <b>brote</b>.", "Si fallas un día que tocaba, ese árbol se <b>marchita</b>. Cumple el siguiente y lo salvas.", "Si fallas dos seguidos, cae <b>seco</b>. Nunca falles dos veces.", "Los días que no tocan quedan en pasto, sin castigo. Mientras el frente está congelado, tampoco cuenta."]]
 };
 function helpSheet(k){
   const h = HELP[k]; if (!h) return;
@@ -1015,7 +1060,7 @@ function guideSheet(){
     <h3>Cada día</h3>
     <ol><li><b>Durante el día:</b> lo que se te ocurra va a la Bandeja.</li><li><b>Cada noche, 5 min:</b> en Hoy → <b>Planear mañana</b>. Vacías la Bandeja y eliges la principal de mañana y hasta 2 extras.</li><li><b>Al día siguiente:</b> toca ▶ en la principal, trabaja y marca la casilla. El hábito se marca solo.</li><li><b>Día malo:</b> si no terminas la principal, haz el mínimo y toca <b>Solo mínimo</b> en el hábito.</li></ol>
     <h3>Tu bosque</h3>
-    <p>Cada objetivo con fechas tiene un bosque: un espacio por día. Cada día que avanzas en ese frente crece un árbol. Si era la Principal, da fruto. Si solo hiciste el mínimo, crece un brote.</p>
+    <p>Cada objetivo con fechas tiene una isla con un espacio por día. Cada día que avanzas en ese frente crece un árbol: con fruto si era la Principal, un brote si solo hiciste el mínimo. Si fallas un día que tocaba, el árbol se marchita; cumple al día siguiente y lo salvas. Si fallas dos seguidos, cae seco.</p>
     <h3>Cada domingo, 30 min</h3>
     <ol><li>En Semana responde las 3 preguntas.</li><li>Marca si cumpliste la semana de cada objetivo y escribe qué debe estar hecho la próxima.</li><li>En Frentes escribe las tareas de esa semana.</li></ol>
     <h3>Reglas</h3>
@@ -1080,7 +1125,7 @@ function wizardRender(){
 }
 function wizardCreate(){
   const fid = "f" + uid(), isAct = active().length < 2, now = Date.now();
-  put("fronts", {id:fid, name:W.name, note:W.note, status:isAct ? "active" : "frozen", order:isAct ? active().length + 1 : 50, created:now});
+  put("fronts", {id:fid, name:W.name, note:W.note, status:isAct ? "active" : "frozen", order:isAct ? active().length + 1 : 50, created:now, pauses:isAct ? [] : [{from:today()}]});
   W.tasks.forEach((t, i) => put("tasks", {id:"t" + uid() + i, title:t.title, frontId:fid, minutes:t.minutes, slot:null, date:null, done:false, created:now + i}));
   if (W.goal.title){ const {frontId, ...g} = W.goal; put("goals", {id:"g" + uid(), ...g, frontId:fid, created:now}); }
   if (W.wantHabit){ const {frontId, ...h} = W.habit; put("habits", {id:"h" + uid(), ...h, name:h.name || W.name, frontId:fid, log:{}, order:S.habits.length + 1, created:today()}); }
@@ -1255,8 +1300,8 @@ const A = {
   "wz-habit"(d){ wzCapture(); W.wantHabit = d.v === "1"; if (W.wantHabit && !W.habit.name) W.habit.name = W.name; wzRedraw(); },
   "wz-create"(){ wzCapture(); if (W.wantHabit && !W.habit.days.length){ toast("Elige al menos un día para el hábito."); return; } wizardCreate(); },
   "habit-quick"(d){ habitQuick(d.front); },
-  "front-freeze"(d){ const f = front(d.id); if (f){ put("fronts", {...f, status:"frozen"}); closeModal(); toast(S.habits.some(h => h.frontId === f.id) ? `${f.name} congelado. Su hábito queda en pausa.` : `${f.name} congelado.`); } },
-  "front-activate"(d){ const f = front(d.id); if (!f) return; if (active().length >= 2){ toast("Ya tienes 2 frentes activos. Congela uno primero."); return; } put("fronts", {...f, status:"active", order: active().length + 1}); closeModal(); toast(`${f.name} activado.`); },
+  "front-freeze"(d){ const f = front(d.id); if (f){ put("fronts", {...f, status:"frozen", pauses:[...(f.pauses || []), {from:today()}]}); closeModal(); toast(S.habits.some(h => h.frontId === f.id) ? `${f.name} congelado. Su hábito queda en pausa.` : `${f.name} congelado.`); } },
+  "front-activate"(d){ const f = front(d.id); if (!f) return; if (active().length >= 2){ toast("Ya tienes 2 frentes activos. Congela uno primero."); return; } put("fronts", {...f, status:"active", order: active().length + 1, pauses:(f.pauses || []).map(p => p.to ? p : {...p, to:today()})}); closeModal(); toast(`${f.name} activado.`); },
   "front-del"(d){ if (confirmTap("fdel-" + d.id)){ S.tasks.filter(t => t.frontId === d.id).forEach(t => t.done ? put("tasks", {...t, frontId:null, archived:true}) : remove("tasks", t.id)); S.goals.filter(g => g.frontId === d.id).forEach(g => remove("goals", g.id)); S.habits.filter(h => h.frontId === d.id).forEach(h => remove("habits", h.id)); remove("fronts", d.id); closeModal(); toast("Frente borrado."); } },
   "goal-new"(d){ goalForm(null, null, d && d.front); },
   "goal-sheet"(d){ confirmKey = null; goalSheet(d.id); },
