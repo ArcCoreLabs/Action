@@ -1,0 +1,1294 @@
+<title>Ejecución</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: modo enfoque. Una sola columna de 560px; la tarea principal es lo único destacado. Sin cajas: espacio en blanco y líneas finas. Un solo color de acento, reservado para la P1 y la acción de enfocar. */
+:root{
+  --bg:#FAFAF9; --surface:#FFFFFF; --sunken:#F1F1EF; --ink:#16171A; --muted:#7C7F87; --faint:#B4B6BC; --line:#E9E9E6;
+  --accent:#E2541B; --accent-ink:#FFFFFF; --accent-soft:#FCEBE3;
+  --ok:#2F8A4E; --ok-soft:#E3F2E8; --warn:#C2362B;
+  --p1:var(--accent); --ticket-line:var(--line);
+  --f-sans:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111113; --surface:#18181B; --sunken:#1E1E22; --ink:#EDEDEF; --muted:#8B8C94; --faint:#55565D; --line:#26262B;
+  --accent:#FF7A3D; --accent-ink:#111113; --accent-soft:#33211A;
+  --ok:#5CC27F; --ok-soft:#18291F; --warn:#FF7468; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111113; --surface:#18181B; --sunken:#1E1E22; --ink:#EDEDEF; --muted:#8B8C94; --faint:#55565D; --line:#26262B;
+  --accent:#FF7A3D; --accent-ink:#111113; --accent-soft:#33211A;
+  --ok:#5CC27F; --ok-soft:#18291F; --warn:#FF7468; color-scheme:dark}
+
+*{box-sizing:border-box}
+html,body{background:var(--bg);color:var(--ink)}
+body{font-family:var(--f-sans);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3{margin:0;text-wrap:balance;letter-spacing:-.02em}
+p{margin:0}
+.muted{color:var(--muted)}
+.acc{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+
+/* ---------- shell ---------- */
+.topbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg)}
+.topbar-in{max-width:592px;margin:0 auto;padding:14px 16px;display:flex;align-items:center;gap:4px}
+.brand{font-weight:700;font-size:15px;letter-spacing:-.01em;margin-right:auto}
+.icon-btn{width:38px;height:38px;border-radius:10px;border:0;background:transparent;display:grid;place-items:center;cursor:pointer;flex:none;color:var(--muted)}
+.icon-btn:hover{color:var(--ink);background:var(--sunken)}
+.icon-btn svg{width:19px;height:19px}
+main{max-width:592px;width:100%;margin:0 auto;padding-inline:16px;padding-block:12px calc(100px + env(safe-area-inset-bottom,0px))}
+.nav{position:fixed;left:0;right:0;bottom:0;z-index:30;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px));display:flex;justify-content:center;gap:2px}
+.nav button{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 14px;font-size:11px;font-weight:600;color:var(--faint);cursor:pointer;border-radius:10px;position:relative;min-width:62px}
+.nav button svg{width:21px;height:21px}
+.nav button[aria-current="page"]{color:var(--ink)}
+.nav .badge{position:absolute;top:4px;left:calc(50% + 7px);width:7px;height:7px;border-radius:50%;background:var(--accent);font-size:0}
+@media (min-width:960px){
+  .nav{top:0;bottom:auto;left:0;right:auto;height:100vh;flex-direction:column;justify-content:flex-start;padding:72px 14px 14px;width:180px;background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none}
+  .nav button{flex-direction:row;gap:10px;font-size:14px;padding:9px 12px}
+  .nav .badge{position:static;margin-left:auto}
+  main{padding-block:24px 64px}
+}
+
+/* ---------- type ---------- */
+.date{font-size:13px;color:var(--muted);font-weight:500}
+.label{display:flex;align-items:baseline;gap:8px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin-bottom:10px}
+.label .note{font-weight:500;letter-spacing:0;text-transform:none}
+.label .text-btn{margin-left:auto}
+.page-title{font-size:28px;font-weight:700}
+.page-sub{color:var(--muted);margin-top:2px}
+.page-head{margin:8px 0 28px}
+.block{margin-top:44px}
+.sep{color:var(--faint);margin:0 6px}
+
+/* ---------- controls ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:42px;padding:0 18px;border-radius:12px;border:1px solid var(--line);background:var(--surface);font-weight:600;font-size:14.5px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--faint)}
+.btn.primary{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.btn.go{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.big{min-height:50px;padding:0 26px;font-size:15.5px;border-radius:14px}
+.btn.danger{color:var(--warn)}
+.btn.small{min-height:34px;padding:0 12px;font-size:13px;border-radius:9px}
+.btn.block{width:100%}
+.btn[disabled]{opacity:.4;cursor:not-allowed}
+.text-btn,.link{border:0;background:none;padding:6px 2px;font-weight:600;font-size:13.5px;color:var(--ink);cursor:pointer;text-transform:none;letter-spacing:0;white-space:nowrap}
+.text-btn:hover,.link:hover{color:var(--accent)}
+.text-btn.muted{color:var(--muted)}
+input[type=text],input[type=date],input[type=time],select,textarea{width:100%;min-height:44px;padding:10px 12px;border-radius:10px;border:1px solid transparent;background:var(--sunken);font-size:15px}
+textarea{min-height:80px;resize:vertical;line-height:1.5}
+input::placeholder,textarea::placeholder{color:var(--faint)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--faint);background:var(--surface)}
+label.field{display:grid;gap:6px;font-size:13.5px;font-weight:600}
+label.field .hint{font-weight:500;color:var(--muted);font-size:12.5px}
+.row-form{display:flex;gap:8px;align-items:center}
+.row-form input{flex:1;min-width:0}
+.row-form select{width:auto;flex:none}
+
+.pill{font-size:12px;font-weight:700}
+.pill.p1{color:var(--accent)}
+.pill.p2,.chip{color:var(--muted);font-size:12.5px;font-weight:500}
+.pill.ok{color:var(--ok)}
+.ex{font-size:11.5px;font-weight:600;color:var(--faint);font-style:italic}
+
+/* ---------- foco: la P1 ---------- */
+.focus-block{padding:36px 0 8px;display:grid;gap:12px}
+.p1-title{font-size:clamp(28px,7.4vw,38px);font-weight:700;line-height:1.12}
+.p1-title.empty{color:var(--faint)}
+.p1-title.done{color:var(--faint);text-decoration:line-through;text-decoration-thickness:2px}
+.p1-meta{color:var(--muted);font-size:14px}
+.p1-actions{display:flex;align-items:center;gap:14px;margin-top:10px;flex-wrap:wrap}
+.p1-actions .more{margin-left:auto}
+.win{color:var(--ok);font-weight:700;font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+.notices{display:grid;gap:4px;margin-top:18px}
+.notice{display:flex;gap:10px;align-items:baseline;font-size:13.5px;color:var(--muted);flex-wrap:wrap}
+.notice::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--faint);flex:none;transform:translateY(-2px)}
+.notice.acc::before{background:var(--accent)}
+.notice.warn::before{background:var(--warn)}
+.notice b{color:var(--ink);font-weight:600}
+.notice .text-btn{padding:0;font-size:13px}
+.ticket{border-radius:14px;padding:16px;background:var(--surface);display:grid;gap:6px}
+.tk-top{display:flex;gap:8px;font-size:12px;color:var(--muted)}
+.tk-front{font-weight:600}
+.tk-title{font-size:21px;font-weight:700;line-height:1.2}
+
+/* ---------- filas ---------- */
+.list{display:grid}
+.trow{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line);min-height:52px}
+.trow:first-child{border-top:0}
+.check{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--faint);background:transparent;cursor:pointer;flex:none;display:grid;place-items:center;padding:0}
+.check:hover{border-color:var(--ok)}
+.check svg{width:12px;height:12px;opacity:0}
+.check.on{background:var(--ok);border-color:var(--ok)}
+.check.on svg{opacity:1}
+.check.on path{stroke:var(--bg)}
+.tmain{flex:1;min-width:0;display:grid;gap:1px}
+.ttitle{font-weight:500;overflow-wrap:anywhere}
+.trow.done .ttitle{text-decoration:line-through;color:var(--faint)}
+.tmeta{font-size:12.5px;color:var(--muted)}
+.more{width:32px;height:32px;border-radius:8px;border:0;background:transparent;cursor:pointer;color:var(--faint);flex:none;display:grid;place-items:center}
+.more:hover{background:var(--sunken);color:var(--ink)}
+.more svg{width:17px;height:17px}
+.add-line{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line);color:var(--muted)}
+.add-line .plus{width:22px;text-align:center;color:var(--faint);font-size:18px;line-height:1}
+.add-line input{background:transparent;padding:6px 0;min-height:36px;border:0}
+.add-line input:focus{background:transparent;border:0}
+.add-line select{background:transparent;min-height:36px;padding:4px 6px;font-size:13px;color:var(--muted)}
+.empty{padding:14px 0;color:var(--muted);font-size:14px}
+
+/* ---------- hábitos ---------- */
+.hrow{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.hrow:first-child{border-top:0}
+.hrow .tmain{gap:0}
+.toggle{display:flex;gap:4px}
+.toggle button{min-height:32px;padding:0 11px;border-radius:9px;border:1px solid var(--line);background:transparent;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer}
+.toggle button.on-full{background:var(--ok);border-color:var(--ok);color:var(--bg)}
+.toggle button.on-min{border-color:var(--ok);color:var(--ok)}
+.dots{display:flex;justify-content:space-between;max-width:320px;margin-top:16px}
+.dot{display:grid;justify-items:center;gap:6px;font-size:11px;color:var(--faint);font-weight:600}
+.dot i{width:8px;height:8px;border-radius:50%;background:var(--line)}
+.dot i.win{background:var(--ok)}
+.dot i.min{background:transparent;box-shadow:inset 0 0 0 1.5px var(--ok)}
+.dot i.miss{background:transparent;box-shadow:inset 0 0 0 1.5px var(--warn)}
+.dot.today{color:var(--ink)}
+.tonight{display:flex;align-items:center;gap:12px;margin-top:44px;padding-top:16px;border-top:1px solid var(--line);font-size:14px;flex-wrap:wrap}
+.tonight .grow{flex:1;min-width:0;color:var(--muted)}
+.tonight b{color:var(--ink);font-weight:600}
+
+/* ---------- frentes / metas / semana ---------- */
+.front{margin-bottom:40px}
+.front-head{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.front-head h2{font-size:20px;font-weight:700;flex:1;min-width:0}
+.front-sub{font-size:13.5px;color:var(--muted);margin-bottom:8px}
+.front-sub b{color:var(--ink);font-weight:600}
+.frow{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line);flex-wrap:wrap}
+.frow:first-child{border-top:0}
+.card{background:var(--surface);border-radius:14px;padding:14px;display:grid;gap:10px}
+.kv{display:grid;gap:1px;font-size:14.5px;margin:0}
+.kv dt{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}
+.kv dd{margin:0}
+.goal{margin-bottom:44px;display:grid;gap:14px}
+.goal h2{font-size:24px;font-weight:700;line-height:1.15}
+.bar{height:3px;border-radius:2px;background:var(--line);position:relative}
+.bar>span{position:absolute;inset:0 auto 0 0;background:var(--ink);border-radius:2px}
+.bar>i{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--accent);border-radius:1px}
+.bar-legend{font-size:12.5px;color:var(--muted);margin-top:8px}
+.kvs{display:grid;gap:12px}
+details{border-top:1px solid var(--line);padding-top:12px}
+details>summary{cursor:pointer;font-weight:600;font-size:14px;list-style:none;display:flex;align-items:center;gap:8px;color:var(--muted)}
+details>summary:hover{color:var(--ink)}
+details>summary::-webkit-details-marker{display:none}
+details>summary::after{content:"+";margin-left:auto;font-weight:500;color:var(--faint)}
+details[open]>summary::after{content:"–"}
+details>.d-body{padding-top:10px;display:grid;gap:6px}
+.wk{display:flex;gap:10px;align-items:center;padding:6px 0;font-size:14px}
+.wk .n{font-size:12px;color:var(--faint);width:30px;flex:none;font-weight:600}
+.wk.cur{font-weight:700}
+.wk.cur .n{color:var(--accent)}
+.pm{display:grid;gap:10px;font-size:14px}
+.pm div{display:grid;gap:1px}
+.pm span{color:var(--muted);font-size:13px}
+.stats{display:flex;gap:28px;flex-wrap:wrap}
+.stat b{display:block;font-size:26px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.1}
+.stat span{font-size:12.5px;color:var(--muted)}
+.qa{display:grid;gap:22px}
+.step-n{color:var(--faint);font-weight:700;margin-right:6px}
+.checkline{display:flex;gap:10px;align-items:center;font-size:14.5px;cursor:pointer}
+.checkline input{width:18px;height:18px;accent-color:var(--ink)}
+.grid3{display:grid;gap:12px}
+
+/* ---------- modal ---------- */
+.scrim{position:fixed;inset:0;z-index:50;background:rgba(10,10,12,.4);display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--bg);width:100%;max-width:560px;max-height:90vh;overflow:auto;border-radius:20px 20px 0 0;padding:20px 18px calc(22px + env(safe-area-inset-bottom,0px));display:grid;gap:12px;align-content:start}
+@media (min-width:700px){.scrim{align-items:center}.sheet{border-radius:20px;max-height:86vh;padding:24px}}
+.sheet-head{display:flex;align-items:center;gap:10px;margin-bottom:2px}
+.sheet-head h2{flex:1;font-size:20px;font-weight:700}
+.opt{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:12px 14px;background:var(--surface);border:1px solid transparent;border-radius:12px;cursor:pointer;font-weight:600;font-size:14.5px}
+.opt:hover{border-color:var(--line)}
+.opt small{display:block;font-weight:500;color:var(--muted);font-size:12.5px}
+.opt.sel{border-color:var(--ink)}
+.opt.danger{color:var(--warn)}
+.opt .grow{flex:1;min-width:0}
+.group-label{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin-top:8px}
+.steps{display:flex;gap:6px}
+.steps i{flex:1;height:3px;border-radius:2px;background:var(--line)}
+.steps i.on{background:var(--ink)}
+.guide h3{font-size:15px;margin-top:10px}
+.guide p,.guide li{font-size:14px}
+.guide ul,.guide ol{margin:0;padding-left:20px;display:grid;gap:4px}
+.tpl{font-family:var(--f-mono);font-size:12.5px;background:var(--surface);border-radius:10px;padding:12px;white-space:pre-wrap;overflow-x:auto;line-height:1.6}
+.stack{display:grid;gap:10px}
+
+/* ---------- enfoque ---------- */
+.focus{position:fixed;inset:0;z-index:60;background:var(--bg);color:var(--ink);display:grid;place-items:center;padding:24px 16px calc(24px + env(safe-area-inset-bottom,0px))}
+.focus-in{width:100%;max-width:420px;display:grid;gap:24px;justify-items:center;text-align:center}
+.focus .eyebrow{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+.focus h2{font-size:22px;font-weight:700}
+.ring{width:min(68vw,250px);aspect-ratio:1;position:relative;max-width:100%}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring circle{stroke-width:2.5}
+.ring .time{position:absolute;inset:0;display:grid;place-items:center;font-size:clamp(44px,13vw,60px);font-weight:600;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.presets{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.presets button{min-height:36px;padding:0 14px;border-radius:10px;border:1px solid var(--line);background:transparent;font-weight:600;cursor:pointer;color:var(--muted)}
+.presets button.on{border-color:var(--ink);color:var(--ink)}
+textarea.auto{min-height:44px;height:44px;resize:none;overflow:hidden;line-height:1.45;padding-block:11px}
+.adjust{display:flex;align-items:center;gap:18px}
+.adjust span{font-weight:700;font-size:16px;min-width:64px;text-align:center}
+.adjust button{width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:transparent;font-weight:700;font-size:15px;color:var(--ink);cursor:pointer}
+.focus-note{font-size:13.5px;color:var(--muted);max-width:34ch}
+
+.toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:80;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;font-weight:600;max-width:calc(100% - 32px)}
+@media (min-width:960px){.toast{bottom:28px}}
+.banner{background:var(--sunken);border-radius:12px;padding:12px 14px;font-size:14px;margin-bottom:16px}
+.loading{padding:60px 0;text-align:center;color:var(--faint)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+/* ---------- v3: casillas claras + ayuda "!" ---------- */
+.sec-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.sec-head h2{font-size:17px;font-weight:700;letter-spacing:-.01em}
+.sec-head h1{font-size:28px;font-weight:700}
+.sec-head .count{font-size:13px;color:var(--muted);font-weight:600}
+.sec-head .count.ok{color:var(--ok)}
+.sec-head .text-btn{margin-left:auto}
+.sec-head .info{margin-left:auto}
+.sec-head .text-btn + .info{margin-left:6px}
+.date-title{font-size:26px;font-weight:700;letter-spacing:-.02em}
+.info{width:24px;height:24px;border-radius:50%;border:1.5px solid var(--faint);background:transparent;color:var(--muted);font-weight:800;font-size:13px;line-height:1;display:grid;place-items:center;cursor:pointer;flex:none;padding:0}
+.info:hover{border-color:var(--accent);color:var(--accent)}
+.block{margin-top:36px}
+.check{width:24px;height:24px;border-radius:7px;border:2px solid var(--faint)}
+.check svg{width:14px;height:14px}
+.check.big{width:30px;height:30px;border-radius:9px}
+.check.big svg{width:17px;height:17px}
+.check.half{background:var(--ok-soft);border-color:var(--ok)}
+.check.half svg{opacity:1}
+.check.half path{stroke:var(--ok)}
+.trow{min-height:56px}
+.trow.plain{border-top:0;padding-top:0}
+.trow.cur .tmeta{color:var(--accent)}
+.ttitle{font-size:15.5px}
+.main-task{display:flex;align-items:center;gap:14px;padding:18px 14px 18px 18px;background:var(--surface);border-radius:18px;box-shadow:0 1px 2px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.05)}
+.main-task .mt-title{font-size:20px;font-weight:700;line-height:1.25;letter-spacing:-.01em;overflow-wrap:anywhere}
+.main-task.done .mt-title{text-decoration:line-through;color:var(--faint)}
+.main-task .tmain{gap:4px}
+.ok{color:var(--ok);font-weight:600}
+.play{width:46px;height:46px;border-radius:50%;border:0;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;cursor:pointer;flex:none}
+.play svg{width:18px;height:18px;margin-left:2px}
+.play.small{width:34px;height:34px;background:var(--sunken);color:var(--ink)}
+.play.small svg{width:13px;height:13px}
+.play:hover{filter:brightness(1.07)}
+.dash{display:flex;align-items:center;gap:10px;width:100%;min-height:56px;padding:0 16px;border-radius:14px;border:1.5px dashed var(--line);background:transparent;color:var(--muted);font-weight:600;font-size:15px;cursor:pointer;text-align:left}
+.dash span{font-size:20px;font-weight:500;color:var(--faint);width:24px;text-align:center}
+.dash:hover{border-color:var(--faint);color:var(--ink)}
+.chip-btn{min-height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:transparent;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;flex:none}
+.chip-btn:hover{border-color:var(--faint);color:var(--ink)}
+.chip-btn.on{border-color:var(--ok);color:var(--ok);background:var(--ok-soft)}
+.capture{display:flex;gap:8px}
+.capture input{flex:1;min-width:0;min-height:52px;font-size:16px;border-radius:14px}
+.capture .btn{min-height:52px;width:52px;padding:0;font-size:24px;font-weight:500;border-radius:14px}
+.empty.center{text-align:center;padding:48px 0;color:var(--faint)}
+.add-line select{width:auto}
+.front{margin-bottom:32px}
+.vision{font-size:18px;font-weight:600;line-height:1.4}
+.goal{margin-bottom:28px}
+.goal h2{font-size:21px}
+.field-label{font-size:13.5px;font-weight:600}
+input.box{appearance:none;-webkit-appearance:none;width:24px;height:24px;border-radius:7px;border:2px solid var(--faint);margin:0;flex:none;display:grid;place-items:center;cursor:pointer;background:transparent}
+input.box:checked{background:var(--ok);border-color:var(--ok)}
+input.box:checked::after{content:"";width:10px;height:6px;border-left:2.4px solid var(--bg);border-bottom:2.4px solid var(--bg);transform:translateY(-1px) rotate(-45deg)}
+  .front-goal{display:grid;gap:1px;padding:10px 12px;margin:2px 0 8px;background:var(--surface);border-radius:12px;font-size:14.5px}
+.front-goal b{font-weight:700}
+.fg-week{font-size:13px;color:var(--accent);font-weight:600}
+.front-goal .fg-habit{margin-top:6px;padding-top:6px;border-top:1px solid var(--line)}
+.front-add{display:flex;gap:16px;margin:-2px 0 6px}
+.wz-step{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+.wz-q{font-size:21px;font-weight:700;line-height:1.25}
+.wz-nav{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap}
+.days{display:flex;gap:6px;flex-wrap:wrap}
+.day-tog{cursor:pointer}
+.day-tog input{position:absolute;opacity:0;pointer-events:none}
+.day-tog span{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;border:1.5px solid var(--line);font-weight:700;font-size:13px;color:var(--muted)}
+.day-tog input:checked + span{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.day-tog input:focus-visible + span{outline:2px solid var(--accent);outline-offset:2px}
+ul.help{margin:0;padding-left:20px;display:grid;gap:8px;font-size:15px;line-height:1.5}
+ul.help li::marker{color:var(--faint)}
+.dots{max-width:none}
+</style>
+
+
+<div class="app">
+  <header class="topbar">
+    <div class="topbar-in">
+      <span class="brand">Ejecución</span>
+      <button class="icon-btn" data-act="settings" aria-label="Ajustes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></button>
+    </div>
+  </header>
+  <main id="view"><div class="loading">Cargando…</div></main>
+  <nav class="nav" id="nav" aria-label="Secciones">
+    <button data-act="nav" data-v="hoy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3"/></svg>Hoy</button>
+    <button data-act="nav" data-v="bandeja"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 13l2.8-7.5h11.4l2.8 7.5v5.5h-17z"/><path d="M3.5 13h5l1.5 2.5h4L15.5 13h5"/></svg>Bandeja<span class="badge" id="inboxBadge" hidden></span></button>
+    <button data-act="nav" data-v="frentes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Frentes</button>
+    <button data-act="nav" data-v="metas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 21V4"/><path d="M6 4h11l-2 4 2 4H6"/></svg>Metas</button>
+    <button data-act="nav" data-v="semana"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8.5 3v4M15.5 3v4"/></svg>Semana</button>
+  </nav>
+</div>
+<div id="modal"></div>
+<div id="focus"></div>
+<div id="toastRoot"></div>
+
+<script>
+(function(){
+"use strict";
+/* ================= utilidades ================= */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pad = n => String(n).padStart(2,"0");
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parse = s => { const [y,m,d] = s.split("-").map(Number); return new Date(y, m-1, d); };
+const addDays = (s,n) => { const d = parse(s); d.setDate(d.getDate()+n); return ymd(d); };
+const today = () => ymd(new Date());
+const dow = s => parse(s).getDay();
+const monday = s => { const d = parse(s); d.setDate(d.getDate() - ((d.getDay()+6)%7)); return ymd(d); };
+const diffDays = (a,b) => Math.round((parse(b) - parse(a)) / 864e5);
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const fmt = (s, o) => new Intl.DateTimeFormat("es-CO", o).format(parse(s));
+const fmtShort = s => fmt(s, {day:"numeric", month:"short"});
+const DAYS = ["D","L","M","X","J","V","S"];
+const DAYNAMES = ["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
+const ICON = {
+  more:'<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>',
+  check:'<svg viewBox="0 0 16 16" fill="none"><path d="M3.5 8.5l3 3 6-7" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  close:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>'
+};
+const exB = o => o && o.example ? '<span class="ex">ejemplo</span>' : "";
+
+/* ================= estado ================= */
+const S = { tasks:[], fronts:[], goals:[], habits:[], reviews:[], settings:{}, focus:{days:{}} };
+const SOURCES = ["tasks","fronts","goals","habits","reviews","settings","focus"];
+const ready = new Set();
+let db = null, mode = "connecting";
+let view = "hoy";
+try { const v = localStorage.getItem("ej-view"); if (v && ["hoy","bandeja","frentes","metas","semana"].includes(v)) view = v; } catch(e){}
+
+/* ================= escritura ================= */
+const queue = {};
+function clean(o){ return JSON.parse(JSON.stringify(o)); }
+function writeErr(e){
+  const c = e && e.code;
+  if (c === "quota_exceeded") toast("El almacenamiento está lleno. Borra tareas hechas antiguas.");
+  else if (c === "invalid_argument") toast("No se pudo guardar ese cambio.");
+  else if (c === "revoked") toast("Se perdió el acceso. Recarga la página.");
+  else toast("No se pudo guardar. Revisa tu conexión.");
+}
+function run(path, fn){
+  queue[path] = (queue[path] || Promise.resolve()).then(() => fn().catch(e => {
+    if (e && e.code === "unavailable") return new Promise(r => setTimeout(r, 600 + Math.random()*600)).then(fn).catch(writeErr);
+    writeErr(e);
+  }));
+}
+function put(col, obj){
+  const { id, ...body } = obj;
+  body.updated = Date.now();
+  if (mode !== "db"){
+    if (col === "meta") S[id] = body;
+    else { const arr = S[col]; const i = arr.findIndex(x => x.id === id); const next = {id, ...body}; if (i >= 0) arr[i] = next; else arr.push(next); }
+    sched(); return;
+  }
+  const data = clean(body);
+  run(col + "/" + id, () => db.doc(col + "/" + id).set(data));
+}
+function remove(col, id){
+  if (mode !== "db"){ S[col] = S[col].filter(x => x.id !== id); sched(); return; }
+  run(col + "/" + id, () => db.doc(col + "/" + id).delete());
+}
+const putMeta = (k, body) => put("meta", {id:k, ...body});
+
+/* ================= consultas ================= */
+const byOrder = (a,b) => (a.order ?? 99) - (b.order ?? 99) || String(a.name).localeCompare(b.name);
+const active = () => S.fronts.filter(f => f.status === "active").sort(byOrder);
+const frozen = () => S.fronts.filter(f => f.status !== "active").sort(byOrder);
+const front = id => S.fronts.find(f => f.id === id);
+const task = id => S.tasks.find(t => t.id === id);
+const crit = d => S.tasks.find(t => t.date === d && t.slot === "critical");
+const secs = d => S.tasks.filter(t => t.date === d && t.slot === "secondary").sort((a,b) => (a.created||0) - (b.created||0));
+const inbox = () => S.tasks.filter(t => !t.frontId && !t.done && !t.slot).sort((a,b) => (a.created||0) - (b.created||0));
+const habits = () => S.habits.slice().sort(byOrder);
+const goalWeeks = g => (g && g.start && g.deadline && g.deadline >= g.start) ? Math.max(1, Math.min(52, Math.ceil((diffDays(g.start, g.deadline) + 1) / 7))) : 12;
+const goalFor = fid => S.goals.filter(g => g.frontId === fid && (!g.deadline || g.deadline >= today())).sort((a,b) => String(a.start||"").localeCompare(String(b.start||"")))[0];
+const habitPaused = h => { if (!h.frontId) return false; const f = S.fronts.find(x => x.id === h.frontId); return !!f && f.status !== "active"; };
+const scheduled = (h, d) => !habitPaused(h) && (h.days || []).includes(dow(d));
+const settings = () => S.settings || {};
+
+function streak(h){
+  const log = h.log || {}; let d = today(), n = 0;
+  if (!log[d]) d = addDays(d, -1);
+  for (let i = 0; i < 500; i++){
+    if (h.created && d < h.created) break;
+    if (scheduled(h, d)){ if (log[d]) n++; else break; }
+    d = addDays(d, -1);
+  }
+  return n;
+}
+function prevScheduled(h, from, k){ // k-ésimo día programado antes de `from`
+  let d = from, found = [];
+  for (let i = 0; i < 21 && found.length < k; i++){ d = addDays(d, -1); if (scheduled(h, d)) found.push(d); }
+  return found;
+}
+function missedRun(h){ // cuántos días programados seguidos se fallaron antes de hoy
+  const log = h.log || {}; const prev = prevScheduled(h, today(), 2); let n = 0;
+  for (const d of prev){ if (h.created && d < h.created) break; if (!log[d]) n++; else break; }
+  return n;
+}
+function dayState(d){
+  const c = crit(d);
+  if (c && c.done) return "win";
+  if (S.habits.some(h => (h.log || {})[d])) return "min";
+  if (d < today() && (c || S.habits.some(h => scheduled(h, d) && (!h.created || d >= h.created)))) return "miss";
+  return "none";
+}
+function goalWeek(g){ // 0 = aún no empieza
+  if (!g.start) return 1;
+  if (today() < g.start) return 0;
+  return Math.max(1, Math.min(goalWeeks(g), Math.floor(diffDays(g.start, today()) / 7) + 1));
+}
+
+/* ================= asignar tareas ================= */
+function assign(id, date, slot, quiet){
+  const t = task(id); if (!t) return false;
+  if (slot === "critical"){
+    const cur = crit(date);
+    if (cur && cur.id !== id && cur.done){ toast("La principal de ese día ya está hecha. Añade esta como extra."); return false; }
+    if (cur && cur.id !== id) put("tasks", {...cur, date:null, slot:null});
+  } else {
+    const s = secs(date).filter(x => x.id !== id);
+    if (s.length >= 2){ toast("Ese día ya tiene 2 extras. Es el máximo."); return false; }
+  }
+  put("tasks", {...t, date, slot, done:false, doneAt:null});
+  if (!quiet){
+    const when = date === today() ? "hoy" : date === addDays(today(),1) ? "mañana" : fmtShort(date);
+    toast(slot === "critical" ? `Principal de ${when} lista.` : `Extra de ${when} listo.`);
+  }
+  return true;
+}
+function unassign(id){ const t = task(id); if (t) put("tasks", {...t, date:null, slot:null}); }
+function toggleDone(id){
+  const t = task(id); if (!t) return;
+  const done = !t.done;
+  put("tasks", {...t, done, doneAt: done ? today() : null});
+  const hs = syncHabit(t, done);
+  if (done && t.slot === "critical" && t.date === today()) toast(hs.length ? `Día ganado. Hábito ${hs.join(" y ")} marcado.` : "Día ganado.");
+  else if (done && hs.length) toast(`Hábito ${hs.join(" y ")} marcado.`);
+}
+function syncHabit(t, done){ // al completar una tarea de un frente, marca el hábito ligado a ese frente
+  const d = today(), names = [];
+  if (!t.frontId) return names;
+  S.habits.filter(h => h.frontId === t.frontId && scheduled(h, d)).forEach(h => {
+    const log = {...(h.log || {})};
+    if (done && !log[d]){ log[d] = "auto"; put("habits", {...h, log}); names.push(h.name); }
+    else if (!done && log[d] === "auto" && !S.tasks.some(x => x.id !== t.id && x.frontId === t.frontId && x.done && x.doneAt === d)){ delete log[d]; put("habits", {...h, log}); }
+  });
+  return names;
+}
+
+/* ================= render ================= */
+let pending = false;
+function sched(){ if (!pending){ pending = true; requestAnimationFrame(() => { pending = false; render(); }); } }
+function captureFocus(){
+  const a = document.activeElement;
+  if (!a || !a.id || !/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return null;
+  let s = null, e = null; try { s = a.selectionStart; e = a.selectionEnd; } catch(x){}
+  return { id:a.id, value:a.type === "checkbox" ? null : a.value, s, e };
+}
+function restoreFocus(k){
+  if (!k) return; const el = document.getElementById(k.id); if (!el) return;
+  if (k.value !== null && el.value !== k.value) el.value = k.value;
+  el.focus({preventScroll:true});
+  try { if (k.s !== null) el.setSelectionRange(k.s, k.e); } catch(x){}
+}
+function render(){
+  const k = captureFocus();
+  document.querySelectorAll("#nav button").forEach(b => b.setAttribute("aria-current", b.dataset.v === view ? "page" : "false"));
+  const n = inbox().length, badge = $("#inboxBadge");
+  badge.hidden = !n; badge.textContent = n;
+  const v = $("#view");
+  if (mode === "connecting" || (mode === "db" && ready.size < SOURCES.length)){
+    v.innerHTML = '<div class="loading">Cargando tu sistema…</div>';
+  } else {
+    const banner = mode === "local" ? '<div class="banner"><b>Modo prueba.</b> No hay conexión con tu almacenamiento, así que lo que hagas aquí no se guarda. Abre la app desde tu cuenta de Claude para guardar y sincronizar.</div>' : "";
+    v.innerHTML = banner + VIEWS[view]();
+  }
+  if (modal.render && modal.live) $("#modal").innerHTML = modal.render();
+  restoreFocus(k);
+  growAll();
+}
+
+/* ---------- piezas comunes ---------- */
+const dayWord = d => d === today() ? "hoy" : d === addDays(today(), 1) ? "mañana" : fmtShort(d);
+const join = parts => parts.filter(Boolean).join('<span class="sep">·</span>');
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+const PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>';
+const info = k => `<button class="info" data-act="help" data-k="${k}" aria-label="Cómo se usa">!</button>`;
+const head = (title, k, extra = "", tag = "h2") => `<div class="sec-head"><${tag}>${title}</${tag}>${extra}${info(k)}</div>`;
+const dash = (label, act, attrs = "") => `<button class="dash" data-act="${act}" ${attrs}><span>+</span>${label}</button>`;
+
+function taskRow(t, opts = {}){
+  const f = front(t.frontId);
+  const when = !opts.noWhen && t.slot && t.date && t.date >= today() ? `<span class="${t.slot === "critical" ? "acc" : ""}">${t.slot === "critical" ? "Principal" : "Extra"} ${dayWord(t.date)}</span>` : "";
+  const meta = join([when, opts.showFront && f ? esc(f.name) : "", t.minutes ? `${t.minutes} min` : ""]);
+  return `<div class="trow ${t.done ? "done" : ""}">
+    <button class="check ${t.done ? "on" : ""}" data-act="done" data-id="${t.id}" aria-label="${t.done ? "Desmarcar" : "Marcar hecha"}">${ICON.check}</button>
+    <div class="tmain"><span class="ttitle">${esc(t.title)}</span>${meta ? `<span class="tmeta">${meta}</span>` : ""}</div>
+    ${opts.focus && !t.done ? `<button class="play small" data-act="focus" data-id="${t.id}" aria-label="Empezar temporizador">${PLAY}</button>` : ""}
+    <button class="more" data-act="task-sheet" data-id="${t.id}" aria-label="Opciones">${ICON.more}</button>
+  </div>`;
+}
+
+/* ================= VISTAS ================= */
+const VIEWS = {};
+
+VIEWS.hoy = function(){
+  const d = today(), c = crit(d), s = secs(d), hs = habits();
+  const cT = crit(addDays(d, 1));
+
+  const nt = [];
+  const names = list => list.map(h => esc(h.name)).join(" y ");
+  const pend = hs.filter(h => scheduled(h, d) && !(h.log || {})[d]);
+  const alarm = pend.filter(h => missedRun(h) >= 2), once = pend.filter(h => missedRun(h) === 1);
+  if (alarm.length) nt.push(`<p class="notice warn"><span>Llevas 2 días sin cumplir <b>${names(alarm)}</b>. Hoy haz al menos el mínimo.</span></p>`);
+  else if (once.length) nt.push(`<p class="notice acc"><span>La última vez no cumpliste <b>${names(once)}</b>. Hoy no falles: haz al menos el mínimo.</span></p>`);
+  S.tasks.filter(t => t.slot && t.date && t.date < d && !t.done).forEach(t => nt.push(`<p class="notice"><span>Pendiente: <b>${esc(t.title)}</b></span><button class="text-btn" data-act="carry" data-id="${t.id}">Pasar a hoy</button><button class="text-btn muted" data-act="unassign" data-id="${t.id}">Quitar</button></p>`));
+  if (dow(d) === 0 && !(S.reviews.find(r => r.id === monday(d)) || {}).closed) nt.unshift(`<p class="notice acc"><span>Hoy toca la revisión semanal.</span><button class="text-btn" data-act="nav" data-v="semana">Abrir</button></p>`);
+
+  let main;
+  if (c){
+    const f = front(c.frontId);
+    main = `<div class="main-task ${c.done ? "done" : ""}">
+      <button class="check big ${c.done ? "on" : ""}" data-act="done" data-id="${c.id}" aria-label="${c.done ? "Desmarcar" : "Marcar hecha"}">${ICON.check}</button>
+      <div class="tmain"><span class="mt-title">${esc(c.title)}</span><span class="tmeta">${c.done ? '<span class="ok">Día ganado</span>' : join([f ? esc(f.name) : "", c.minutes ? `${c.minutes} min` : ""])}</span></div>
+      ${c.done ? "" : `<button class="play" data-act="focus" data-id="${c.id}" aria-label="Empezar temporizador">${PLAY}</button>`}
+      <button class="more" data-act="task-sheet" data-id="${c.id}" aria-label="Opciones">${ICON.more}</button></div>`;
+  } else main = S.fronts.length ? dash("Elegir tarea principal", "pick", `data-date="${d}" data-slot="critical"`) : dash("Crear tu primer frente", "front-new");
+
+  const extras = s.map(t => taskRow(t, {focus:true, noWhen:true, showFront:true})).join("") + (s.length < 2 ? dash("Añadir extra", "pick", `data-date="${d}" data-slot="secondary" style="${s.length ? "margin-top:8px" : ""}"`) : "");
+
+  const todayH = hs.filter(h => scheduled(h, d));
+  const hrows = todayH.map(h => {
+    const lg = (h.log || {})[d], sk = streak(h), full = lg === "full" || lg === "auto";
+    return `<div class="trow">
+      <button class="check ${full ? "on" : lg === "min" ? "half" : ""}" data-act="hcheck" data-id="${h.id}" aria-label="Marcar ${esc(h.name)}">${ICON.check}</button>
+      <div class="tmain"><span class="ttitle">${esc(h.name)}</span><span class="tmeta">${join([lg === "min" ? '<span class="ok">Mínimo cumplido</span>' : h.minimum ? `Mínimo: ${esc(h.minimum)}` : "", sk ? `${sk} ${sk === 1 ? "día" : "días"} seguidos` : ""])}</span></div>
+      <button class="chip-btn ${lg === "min" ? "on" : ""}" data-act="hlog" data-id="${h.id}" data-k="min">Solo mínimo</button></div>`;
+  }).join("");
+
+  const mon = monday(d);
+  const dots = Array.from({length:7}, (_, i) => { const x = addDays(mon, i); return `<span class="dot ${x === d ? "today" : ""}">${DAYS[dow(x)]}<i class="${dayState(x)}"></i></span>`; }).join("");
+
+  return `
+  <div class="sec-head page"><h1 class="date-title">${cap(fmt(d, {weekday:"long", day:"numeric", month:"long"}))}</h1></div>
+  ${nt.length ? `<div class="notices">${nt.slice(0,4).join("")}</div>` : ""}
+  <section class="block">${head("Principal", "principal")}${main}</section>
+  <section class="block">${head("Extras", "extras", `<span class="count">${s.length}/2</span>`)}<div class="list">${extras}</div></section>
+  <section class="block">${head("Hábitos", "habitos", hs.length ? '<button class="text-btn muted" data-act="habits-edit">Editar</button>' : "")}
+    ${hs.length ? (hrows ? `<div class="list">${hrows}</div>` : '<p class="empty">Hoy no toca ningún hábito.</p>') : dash("Crear hábito", "habit-new")}</section>
+  <section class="block">${head("Semana", "dots")}<div class="dots">${dots}</div></section>
+  <section class="block">${head("Mañana", "manana")}
+    ${cT ? `<div class="trow plain"><div class="tmain"><span class="ttitle">${esc(cT.title)}</span><span class="tmeta">Principal de mañana</span></div><button class="text-btn" data-act="night">Cambiar</button></div>` : dash("Planear mañana", "night")}</section>`;
+};
+
+VIEWS.bandeja = function(){
+  const items = inbox();
+  return `
+  <div class="page-head">${head("Bandeja", "bandeja", "", "h1")}</div>
+  <form class="capture" data-form="capture"><input type="text" id="cap" placeholder="Escribe algo pendiente…" autocomplete="off" aria-label="Capturar"><button class="btn primary" type="submit" aria-label="Guardar">+</button></form>
+  ${items.length ? `<div class="list" style="margin-top:18px">${items.map(t => `
+    <div class="trow"><button class="check" data-act="inbox-done" data-id="${t.id}" aria-label="Hecho">${ICON.check}</button>
+    <div class="tmain"><span class="ttitle">${esc(t.title)}</span></div>
+    <button class="chip-btn" data-act="move-sheet" data-id="${t.id}">Mover</button></div>`).join("")}</div>`
+  : '<p class="empty center">Vacía</p>'}`;
+};
+
+VIEWS.frentes = function(){
+  const act = active(), fr = frozen();
+  const sect = f => {
+    const ts = S.tasks.filter(t => t.frontId === f.id);
+    const open = ts.filter(t => !t.done).sort((a,b) => (a.slot ? 0 : 1) - (b.slot ? 0 : 1) || (a.created||0) - (b.created||0));
+    const done = ts.filter(t => t.done).sort((a,b) => String(b.doneAt||"").localeCompare(String(a.doneAt||"")));
+    return `<section class="front">
+      <div class="front-head"><h2>${esc(f.name)}</h2><button class="more" data-act="front-sheet" data-id="${f.id}" aria-label="Opciones del frente">${ICON.more}</button></div>
+      ${(() => { const g = goalFor(f.id), h = S.habits.find(x => x.frontId === f.id);
+        const gHtml = g ? (() => { const wk = goalWeek(g), n = goalWeeks(g), cur = (g.weekly || [])[Math.max(0, wk-1)];
+          return `<span class="tmeta">${wk ? `Objetivo · semana ${wk} de ${n}` : `Objetivo · empieza el ${fmtShort(g.start)}`}</span><b>${esc(g.title)}</b>${cur && cur.text ? `<span class="fg-week">${wk ? "Esta semana" : "Primera semana"}: ${esc(cur.text)}</span>` : ""}`; })() : "";
+        const hHtml = h ? `<span class="tmeta fg-habit">Hábito · ${esc(daysLabel(h.days))}${h.minimum ? ` · mínimo ${esc(h.minimum)}` : ""}${h.standard ? ` · estándar ${esc(h.standard)}` : ""}</span>` : "";
+        const add = [!g ? `<button class="text-btn muted" data-act="goal-new" data-front="${f.id}">+ Objetivo</button>` : "", !h ? `<button class="text-btn muted" data-act="habit-quick" data-front="${f.id}">+ Hábito</button>` : ""].join("");
+        return (g || h ? `<div class="front-goal">${gHtml}${hHtml}</div>` : "") + (add ? `<div class="front-add">${add}</div>` : ""); })()}
+      <div class="list">${open.map(t => taskRow(t)).join("")}
+        <form class="add-line" data-form="add-task" data-front="${f.id}"><span class="plus">+</span>
+          <input type="text" id="add-${f.id}" placeholder="Nueva tarea" autocomplete="off" aria-label="Nueva tarea">
+          <select id="min-${f.id}" aria-label="Minutos"><option value="15">15 min</option><option value="25">25 min</option><option value="45" selected>45 min</option><option value="60">60 min</option><option value="90">90 min</option></select><button class="text-btn" type="submit">Añadir</button></form></div>
+      ${done.length ? `<details style="margin-top:6px"><summary>Hechas (${done.length})</summary><div class="d-body"><div class="list">${done.slice(0,30).map(t => taskRow(t)).join("")}</div></div></details>` : ""}
+    </section>`;
+  };
+  return `
+  <div class="page-head">${head("Frentes", "frentes", `<span class="count">${act.length}/2</span>`, "h1")}</div>
+  ${act.map(sect).join("")}
+  ${act.length < 2 ? dash(act.length ? "Crear otro frente" : "Crear frente", "front-new") : ""}
+  <section class="block">${head("Congelados", "congelados", act.length >= 2 ? '<button class="text-btn muted" data-act="front-new">Nuevo</button>' : "")}
+  ${fr.length ? `<div class="list">${fr.map(f => {
+    const n = S.tasks.filter(t => t.frontId === f.id && !t.done).length;
+    return `<div class="trow"><div class="tmain"><span class="ttitle">${esc(f.name)}</span><span class="tmeta">${join([`${n} ${n === 1 ? "tarea" : "tareas"}`, f.note ? esc(f.note) : ""])}</span></div>
+      <button class="chip-btn" data-act="front-activate" data-id="${f.id}">Activar</button>
+      <button class="more" data-act="front-sheet" data-id="${f.id}" aria-label="Opciones del frente">${ICON.more}</button></div>`;
+  }).join("")}</div>` : '<p class="empty">Nada congelado</p>'}</section>`;
+};
+
+VIEWS.metas = function(){
+  const st = settings();
+  const goals = S.goals.slice().sort((a,b) => String(a.deadline||"").localeCompare(String(b.deadline||"")));
+  const sect = g => {
+    const f = front(g.frontId), wk = goalWeek(g), N = goalWeeks(g), weekly = (g.weekly || []).slice(0, N);
+    const doneN = weekly.filter(w => w && w.done).length;
+    const elapsed = g.start && g.deadline ? Math.max(0, Math.min(100, diffDays(g.start, today()) / Math.max(1, diffDays(g.start, g.deadline)) * 100)) : 0;
+    const pm = (g.premortem || []).filter(p => p && (p.cause || p.counter));
+    const items = Array.from({length:N}, (_, i) => ({...(weekly[i] || {}), i}));
+    return `<section class="goal">
+      <div class="front-head"><div class="tmain"><span class="tmeta">${esc(f ? f.name : "Sin frente")}</span><h2>${esc(g.title || "Objetivo sin nombre")}</h2></div>
+        <button class="more" data-act="goal-sheet" data-id="${g.id}" aria-label="Opciones">${ICON.more}</button></div>
+      <div><div class="bar"><span style="width:${doneN/N*100}%"></span><i style="left:${elapsed}%"></i></div>
+        <p class="bar-legend">${join([g.start && today() < g.start ? `Empieza el ${fmtShort(g.start)}` : g.deadline && today() > g.deadline ? (doneN === N ? "Cumplido" : "Plazo vencido") : `Semana ${wk} de ${N}`, `${doneN}/${N} semanas cumplidas`, g.deadline && today() <= g.deadline ? `faltan ${diffDays(today(), g.deadline)} días` : ""])}</p></div>
+      ${items.length ? `<div class="list">${items.map(w => `<div class="trow ${w.done ? "done" : ""} ${w.i + 1 === wk ? "cur" : ""}">
+        <button class="check ${w.done ? "on" : ""}" data-act="goal-week" data-id="${g.id}" data-i="${w.i}" aria-label="Marcar semana ${w.i + 1}">${ICON.check}</button>
+        <div class="tmain"><span class="ttitle">${w.text ? esc(w.text) : '<span class="muted">Sin definir</span>'}</span><span class="tmeta">Semana ${w.i + 1}${w.i + 1 === wk ? " · esta semana" : ""}</span></div></div>`).join("")}</div>` : ""}
+      ${(g.minimum || g.trigger || g.standard || g.why || pm.length) ? `<details><summary>Plan</summary><div class="d-body kvs">
+        ${g.minimum ? `<dl class="kv"><dt>Mínimo innegociable</dt><dd>${esc(g.minimum)}</dd></dl>` : ""}
+        ${g.standard ? `<dl class="kv"><dt>Estándar</dt><dd>${esc(g.standard)}</dd></dl>` : ""}
+        ${g.trigger ? `<dl class="kv"><dt>Disparador</dt><dd>${esc(g.trigger)}</dd></dl>` : ""}
+        ${g.why ? `<dl class="kv"><dt>Por qué</dt><dd>${esc(g.why)}</dd></dl>` : ""}
+        ${pm.length ? `<dl class="kv"><dt>¿Qué podría salir mal?</dt><dd class="pm">${pm.map(p => `<div>${esc(p.cause)}<span>→ ${esc(p.counter)}</span></div>`).join("")}</dd></dl>` : ""}
+        ${g.rewardMid ? `<dl class="kv"><dt>Recompensa a mitad de camino</dt><dd>${esc(g.rewardMid)}</dd></dl>` : ""}
+        ${g.rewardEnd ? `<dl class="kv"><dt>Recompensa al lograrlo</dt><dd>${esc(g.rewardEnd)}</dd></dl>` : ""}
+      </div></details>` : ""}
+    </section>`;
+  };
+  return `
+  <div class="page-head">${head("Metas", "metas", "", "h1")}</div>
+  <section class="block" style="margin-top:0">${head("Visión", "vision", st.vision ? '<button class="text-btn muted" data-act="vision">Editar</button>' : "")}
+    ${st.vision ? `<p class="vision">${esc(st.vision)}</p>` : dash("Escribir visión", "vision")}</section>
+  <section class="block">${head("Objetivos", "objetivos")}
+  ${goals.map(sect).join("")}${dash("Nuevo objetivo", "goal-new")}</section>`;
+};
+
+VIEWS.semana = function(){
+  const d = today(), mon = monday(d), sun = addDays(mon, 6);
+  const r = S.reviews.find(x => x.id === mon) || {};
+  const days = Array.from({length:7}, (_, i) => addDays(mon, i)).filter(x => x <= d);
+  const wins = days.filter(x => { const c = crit(x); return c && c.done; }).length;
+  const hdays = days.filter(x => S.habits.some(h => (h.log || {})[x])).length;
+  const fmin = days.reduce((a, x) => a + ((S.focus.days || {})[x] || 0), 0);
+  const act = active();
+  const past = S.reviews.filter(x => x.id < mon).sort((a,b) => b.id.localeCompare(a.id));
+  const field = (id, label, val) => `<label class="field" for="${id}">${label}<textarea id="${id}" data-review="${id.slice(3)}">${esc(val || "")}</textarea></label>`;
+  return `
+  <div class="page-head">${head("Semana", "semana", `<span class="count">${fmtShort(mon)} – ${fmtShort(sun)}</span>`, "h1")}</div>
+  <div class="stats">
+    <div class="stat"><b>${wins}/${days.length}</b><span>Principales hechas</span></div>
+    <div class="stat"><b>${hdays}</b><span>Días con hábito</span></div>
+    <div class="stat"><b>${Math.floor(fmin/60)}h ${pad(fmin%60)}</b><span>Enfoque</span></div>
+  </div>
+  <section class="block">${head("Revisión", "revision", r.closed ? '<span class="count ok">Cerrada</span>' : "")}
+  <div class="qa">
+    ${field("rv-done", "¿Qué logré?", r.done)}
+    ${field("rv-blocked", "¿Qué me frenó?", r.blocked)}
+    ${field("rv-change", "¿Qué voy a cambiar?", r.change)}
+    <div class="list">
+      <label class="trow" style="cursor:pointer"><input type="checkbox" class="box" id="rv-inbox" data-review-check="inbox" ${r.inbox ? "checked" : ""}><span class="ttitle">Bandeja vacía</span></label>
+      <label class="trow" style="cursor:pointer"><input type="checkbox" class="box" id="rv-frozen" data-review-check="frozen" ${r.frozen ? "checked" : ""}><span class="ttitle">Congelados revisados</span></label>
+    </div>
+    ${(() => { const gs = act.map(f => goalFor(f.id)).filter(Boolean); if (!gs.length) return "";
+      return `<div class="qa" style="gap:14px"><span class="field-label">Tus objetivos</span>${gs.map(g => { const wk = goalWeek(g), N = goalWeeks(g), w = g.weekly || [], cur = w[wk-1] || {}, nx = w[wk] || {};
+        return `<div class="stack" style="gap:8px"><span class="tmeta">${esc(g.title)}</span>
+          ${wk === 0 ? "" : `<div class="trow" style="border-top:0;padding:0;min-height:44px"><button class="check ${cur.done ? "on" : ""}" data-act="goal-week" data-id="${g.id}" data-i="${wk-1}" aria-label="Cumplí la semana">${ICON.check}</button><div class="tmain"><span class="ttitle">Semana ${wk}: ${cur.text ? esc(cur.text) : "sin definir"}</span><span class="tmeta">Márcala si la cumpliste</span></div></div>`}
+          ${wk < N ? `<label class="field" for="rv-w-${g.id}"><span class="tmeta">${wk === 0 ? "Semana 1 (empieza el " + fmtShort(g.start) + ")" : "Semana " + (wk+1)}: ¿qué debe estar hecho?</span><input type="text" id="rv-w-${g.id}" data-week-goal="${g.id}" data-i="${wk}" value="${esc(nx.text || "")}"></label>` : '<span class="tmeta">Es la última semana del objetivo.</span>'}</div>`; }).join("")}</div>`; })()}
+    <button class="btn primary block" data-act="review-close">${r.closed ? "Guardar cambios" : "Cerrar revisión"}</button>
+  </div></section>
+  ${past.length ? `<section class="block">${head("Anteriores", "anteriores")}
+  ${past.map(p => `<details><summary>Semana del ${fmtShort(p.id)}</summary><div class="d-body kvs" style="font-size:14px">
+    <dl class="kv"><dt>Logré</dt><dd>${esc(p.done || "—")}</dd></dl><dl class="kv"><dt>Me frenó</dt><dd>${esc(p.blocked || "—")}</dd></dl><dl class="kv"><dt>Cambio</dt><dd>${esc(p.change || "—")}</dd></dl></div></details>`).join("")}</section>` : ""}`;
+};
+
+/* ----- ayuda "!" de cada apartado ----- */
+const HELP = {
+  principal:["Principal", ["La tarea más importante del día. Solo una.", "Elígela la noche anterior en <b>Mañana</b>.", "Toca <b>▶</b> para empezar un temporizador. Si estás cansado, empieza con 10 minutos.", "Marca la casilla al terminar: con eso el día ya cuenta."]],
+  extras:["Extras", ["Hasta 2 tareas más, opcionales.", "Hazlas solo después de la principal."]],
+  habitos:["Hábitos", ["La tarea dice <b>qué</b> hiciste; el hábito dice si fuiste <b>constante</b>.", "Si ligas el hábito a un frente (en <b>Editar</b>), se marca solo cuando terminas una tarea de ese frente.", "En un día malo, sin terminar ninguna tarea, toca <b>Solo mínimo</b>: cuenta y la racha sigue.", "Si te saltas un día programado, la app te avisa: nunca falles dos seguidos.", "Solo aparecen los días que tú eliges."]],
+  dots:["Semana", ["Un punto por día.", "<b>Verde</b>: terminaste la principal. Día ganado.", "<b>Borde verde</b>: no terminaste la principal, pero cumpliste el mínimo de un hábito. La racha sigue.", "<b>Borde rojo</b>: ese día no hiciste ni la principal ni el mínimo."]],
+  manana:["Mañana", ["Cada noche, 5 minutos:", "1. Vacía la Bandeja.", "2. Elige la principal de mañana.", "3. Si quieres, hasta 2 extras.", "Mañana no decides nada: solo ejecutas."]],
+  bandeja:["Bandeja", ["Escribe aquí cualquier pendiente apenas se te ocurra, sin organizarlo.", "Marca la casilla si ya lo hiciste.", "Toca <b>Mover</b> para enviarlo a un frente.", "Déjala vacía cada noche."]],
+  frentes:["Frentes", ["Tus proyectos, como CCFA o THM.", "<b>Crear frente</b> te guía paso a paso: tareas → objetivo → hábito. El objetivo y el hábito son opcionales.", "Debajo del nombre ves su objetivo, lo que toca esta semana y su hábito.", "Máximo 2 activos al mismo tiempo. El resto va a Congelados.", "Escribe tareas concretas que empiecen con un verbo: “Resolver la sala de XSS”.", "Toca <b>⋯</b> en una tarea para ponerla como principal de hoy o de mañana."]],
+  congelados:["Congelados", ["Proyectos que te interesan pero no son para ahora.", "No se pierden: quedan guardados con sus tareas.", "Toca <b>Activar</b> cuando tengas menos de 2 frentes activos."]],
+  metas:["Metas", ["De lo grande a lo pequeño:", "<b>Visión</b>: hacia dónde vas en años.", "<b>Objetivo</b>: lo que logras entre una fecha de inicio y una fecha límite.", "<b>Semanas</b>: lo que debe estar hecho cada domingo.", "Las tareas del día van en Frentes."]],
+  vision:["Visión", ["Una o dos frases sobre hacia dónde vas en los próximos años.", "Solo da dirección, no es una tarea."]],
+  objetivos:["Objetivos", ["Un resultado medible con fecha límite, como “Aprobar la CCFA”.", "Las semanas salen solas de tus fechas: 4 semanas si pones un mes, 12 si pones tres.", "Escribe qué debe estar hecho cada semana y márcalo el domingo.", "En <b>Plan</b> quedan tu mínimo, cuándo lo haces y qué podría salir mal.", "La línea naranja de la barra marca el tiempo que ha pasado."]],
+  semana:["Semana", ["Arriba ves tus números de la semana.", "El domingo, en 30 minutos, respondes la revisión y defines la meta de la próxima semana."]],
+  revision:["Revisión", ["Responde con frases cortas.", "En <b>¿Qué voy a cambiar?</b> cambia el sistema, no a ti: un horario, un mínimo, una regla.", "Marca si cumpliste la semana de cada objetivo y escribe qué debe estar hecho la próxima.", "Después crea en Frentes las tareas de esa semana."]],
+  anteriores:["Anteriores", ["Tus revisiones pasadas, para ver cómo vas."]]
+};
+function helpSheet(k){
+  const h = HELP[k]; if (!h) return;
+  openModal(() => sheet(h[0], `<ul class="help">${h[1].map(x => `<li>${x}</li>`).join("")}</ul><button class="text-btn muted" data-act="guide" style="justify-self:start">Ver guía completa</button>`), false); modal.guard = false;
+}
+
+/* ================= modales ================= */
+const modal = { render:null, live:false };
+const autoGrow = el => { el.style.height = "auto"; el.style.height = Math.max(44, el.scrollHeight) + "px"; };
+const growAll = () => requestAnimationFrame(() => document.querySelectorAll("textarea.auto").forEach(autoGrow));
+function openModal(fn, live = true){ modal.render = fn; modal.live = live; modal.guard = !live; $("#modal").innerHTML = fn(); growAll(); const f = $("#modal [autofocus]"); if (f) f.focus(); }
+function closeModal(){ modal.render = null; modal.live = false; $("#modal").innerHTML = ""; }
+const sheet = (title, body) => `<div class="scrim" data-act="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="sheet-head"><h2>${title}</h2><button class="icon-btn" data-act="close" aria-label="Cerrar">${ICON.close}</button></div>${body}</div></div>`;
+
+let confirmKey = null;
+function taskSheet(id){
+  openModal(() => {
+    const t = task(id); if (!t) return "";
+    const d = today(), tm = addDays(d, 1);
+    const del = confirmKey === "del-" + id;
+    return sheet("Tarea", `<p style="font-weight:700;font-size:16px">${esc(t.title)} ${exB(t)}</p>
+      <div class="group-label">Programar</div>
+      <button class="opt" data-act="assign" data-id="${id}" data-date="${d}" data-slot="critical"><span class="grow">Principal de hoy</span></button>
+      <button class="opt" data-act="assign" data-id="${id}" data-date="${d}" data-slot="secondary"><span class="grow">Extra de hoy</span></button>
+      <button class="opt" data-act="assign" data-id="${id}" data-date="${tm}" data-slot="critical"><span class="grow">Principal de mañana</span></button>
+      <button class="opt" data-act="assign" data-id="${id}" data-date="${tm}" data-slot="secondary"><span class="grow">Extra de mañana</span></button>
+      ${t.slot ? `<button class="opt" data-act="unassign" data-id="${id}">Quitar del día</button>` : ""}
+      <div class="group-label">Tarea</div>
+      <button class="opt" data-act="done" data-id="${id}">${t.done ? "Desmarcar como hecha" : "Marcar como hecha"}</button>
+      <button class="opt" data-act="task-edit" data-id="${id}">Editar</button>
+      <button class="opt" data-act="move-sheet" data-id="${id}">Mover a otro frente</button>
+      <button class="opt danger" data-act="task-del" data-id="${id}">${del ? "Toca otra vez para borrar" : "Borrar"}</button>`);
+  });
+}
+function moveSheet(id){
+  openModal(() => {
+    const t = task(id); if (!t) return "";
+    const opt = f => `<button class="opt ${t.frontId === f.id ? "sel" : ""}" data-act="move" data-id="${id}" data-front="${f.id}"><span class="grow">${esc(f.name)}</span></button>`;
+    const del = confirmKey === "del-" + id;
+    return sheet("Mover a…", `<p style="font-weight:700">${esc(t.title)}</p>
+      <div class="group-label">Frentes activos</div>${active().map(opt).join("") || '<p class="muted">Sin frentes activos.</p>'}
+      <div class="group-label">Congelados</div>${frozen().map(opt).join("") || '<p class="muted">Sin congelados.</p>'}
+      ${t.frontId ? `<button class="opt" data-act="move" data-id="${id}" data-front="">Volver a la Bandeja</button>` : ""}
+      <button class="opt danger" data-act="task-del" data-id="${id}">${del ? "Toca otra vez para borrar" : "Borrar"}</button>`);
+  });
+}
+function taskEdit(id){
+  const t = task(id); if (!t) return;
+  openModal(() => sheet("Editar tarea", `<form data-form="task-edit" data-id="${id}" class="stack">
+    <label class="field" for="te-title">Tarea<span class="hint">Verbo físico + qué exactamente. Debe caber en una sesión.</span><input type="text" id="te-title" value="${esc(t.title)}" autofocus></label>
+    <label class="field" for="te-min">Tiempo<select id="te-min"><option value="">Sin tiempo</option>${[15,25,45,60,90].map(m => `<option value="${m}" ${t.minutes == m ? "selected" : ""}>${m} min</option>`).join("")}</select></label>
+    <button class="btn primary block" type="submit">Guardar</button></form>`), false);
+}
+function pickSheet(date, slot){
+  openModal(() => {
+    const assigned = new Set(S.tasks.filter(t => t.date === date && t.slot).map(t => t.id));
+    const groups = active().map(f => {
+      const ts = S.tasks.filter(t => t.frontId === f.id && !t.done && !assigned.has(t.id));
+      return ts.length ? `<div class="group-label">${esc(f.name)}</div>${ts.map(t => `<button class="opt" data-act="pick-do" data-id="${t.id}" data-date="${date}" data-slot="${slot}"><span class="grow">${esc(t.title)}<small>${t.minutes ? t.minutes + " min" : ""}${t.date && t.slot ? ` · ya programada ${t.date === today() ? "hoy" : fmtShort(t.date)}` : ""}</small></span>${exB(t)}</button>`).join("")}` : "";
+    }).join("");
+    const label = slot === "critical" ? "tarea principal" : "extra";
+    return sheet(`Elegir ${label}`, `<p class="muted" style="font-size:14px">${slot === "critical" ? "Usa el filtro: 1) ¿Tiene consecuencia real si no se hace? 2) ¿Te acerca a tu objetivo? 3) ¿Hace las demás más fáciles?" : "Opcional. Máximo 2 por día."}</p>
+      ${groups || '<p class="muted">No hay tareas en tus frentes activos. Escribe una nueva abajo.</p>'}
+      <div class="group-label">O escribe una nueva</div>
+      <form class="stack" data-form="pick-new" data-date="${date}" data-slot="${slot}">
+        <input type="text" id="pn-title" placeholder="Verbo + qué exactamente" autocomplete="off">
+        <div class="row-form"><select id="pn-front" style="flex:1;width:100%">${active().map(f => `<option value="${f.id}">${esc(f.name)}</option>`).join("")}<option value="">Bandeja</option></select>
+        <select id="pn-min">${[15,25,45,60].map(m => `<option ${m === 45 ? "selected" : ""}>${m}</option>`).join("")}</select>
+        <button class="btn primary" type="submit">Crear</button></div></form>`);
+  });
+}
+function frontSheet(id){
+  openModal(() => {
+    const f = front(id); if (!f) return "";
+    const n = S.tasks.filter(t => t.frontId === id).length;
+    const del = confirmKey === "fdel-" + id;
+    return sheet(esc(f.name), `<form class="stack" data-form="front-rename" data-id="${id}">
+      <label class="field" for="fr-name">Nombre<input type="text" id="fr-name" value="${esc(f.name)}"></label>
+      <label class="field" for="fr-note">Nota<span class="hint">Opcional. Ej: retomar cuando pase la CCFA.</span><input type="text" id="fr-note" value="${esc(f.note || "")}"></label>
+      <button class="btn block" type="submit">Guardar</button></form>
+      ${(() => { const g = goalFor(id), h = S.habits.find(x => x.frontId === id);
+        return (g ? `<button class="opt" data-act="goal-edit" data-id="${g.id}"><span class="grow">Editar objetivo<small>${esc(g.title)}</small></span></button>` : `<button class="opt" data-act="goal-new" data-front="${id}"><span class="grow">Añadir objetivo</span></button>`)
+          + (h ? `<button class="opt" data-act="habit-edit" data-id="${h.id}"><span class="grow">Editar hábito<small>${esc(daysLabel(h.days))}</small></span></button>` : `<button class="opt" data-act="habit-quick" data-front="${id}"><span class="grow">Añadir hábito</span></button>`); })()}
+      ${f.status === "active" ? `<button class="opt" data-act="front-freeze" data-id="${id}"><span class="grow">Congelar<small>Sale de los activos. Sus tareas quedan guardadas.</small></span></button>`
+                               : `<button class="opt" data-act="front-activate" data-id="${id}"><span class="grow">Activar<small>Solo si tienes menos de 2 activos.</small></span></button>`}
+      <button class="opt danger" data-act="front-del" data-id="${id}"><span class="grow">${del ? "Toca otra vez: se borran sus tareas pendientes, objetivo y hábito" : "Borrar frente"}<small>${del ? "Si solo quieres pausarlo, mejor congélalo." : ""}</small></span></button>`);
+  });
+}
+/* ----- objetivo ----- */
+function weekInputs(n, vals){
+  return `<p class="muted" style="font-size:13px">Duración: <b style="color:var(--ink)">${n} ${n === 1 ? "semana" : "semanas"}</b>, según tus fechas.</p>` +
+    Array.from({length:n}, (_, i) => `<div class="row-form"><span class="muted" style="width:34px;font-size:12px;font-weight:600">S${i+1}</span><textarea class="auto" rows="1" id="g-w${i}" placeholder="Meta de la semana ${i+1}">${esc(vals[i] || "")}</textarea></div>`).join("");
+}
+/* ----- formularios compartidos: el módulo y el asistente usan exactamente los mismos ----- */
+const PH_PM = [["Me aburrí a mitad de camino"],["Llegué cansado y lo aplacé"],["Me distraje con otro frente"]];
+const fixedSelect = (id, name) => `<select id="${id}" disabled><option>${esc(name)}</option></select>`;
+function goalFields(g, opts = {}){
+  g = g || {};
+  const start = g.start || (dow(today()) === 1 ? today() : addDays(monday(today()), 7));
+  const deadline = g.deadline || addDays(start, 27);
+  const w = g.weekly || [], pm = g.premortem || [];
+  const frontSel = opts.fixedFrontName ? fixedSelect("g-front", opts.fixedFrontName)
+    : `<select id="g-front">${S.fronts.slice().sort(byOrder).map(f => `<option value="${f.id}" ${(g.frontId || opts.frontId) === f.id ? "selected" : ""}>${esc(f.name)}${f.status === "active" ? "" : " (congelado)"}</option>`).join("")}</select>`;
+  return `
+    <label class="field" for="g-front">Frente${frontSel}</label>
+    <label class="field" for="g-title">Objetivo<span class="hint">Un resultado medible: que se pueda responder sí o no.</span><textarea class="auto" rows="1" id="g-title" placeholder="Ej: Aprobar la CCFA">${esc(g.title || "")}</textarea></label>
+    <label class="field" for="g-why">Por qué importa<textarea class="auto" rows="1" id="g-why" placeholder="Ej: me lo pidió la empresa">${esc(g.why || "")}</textarea></label>
+    <div class="row-form" style="flex-wrap:wrap"><label class="field" for="g-start" style="flex:1;min-width:140px">Inicio<input type="date" id="g-start" value="${start}"></label>
+      <label class="field" for="g-deadline" style="flex:1;min-width:140px">Fecha límite<input type="date" id="g-deadline" value="${deadline}"></label></div>
+    <label class="field" for="g-standard">Estándar<span class="hint">Lo ideal en un día normal.</span><textarea class="auto" rows="1" id="g-standard" placeholder="Ej: 45 min, lun a vie">${esc(g.standard || "")}</textarea></label>
+    <label class="field" for="g-minimum">Mínimo innegociable<span class="hint">Lo que haces aunque estés destruido.</span><textarea class="auto" rows="1" id="g-minimum" placeholder="Ej: 15 minutos">${esc(g.minimum || "")}</textarea></label>
+    <label class="field" for="g-trigger">Disparador<span class="hint">Cuando [disparador], haré [acción] en [lugar].</span><textarea class="auto" rows="1" id="g-trigger" placeholder="Ej: al llegar del trabajo">${esc(g.trigger || "")}</textarea></label>
+    <div class="group-label">Semana a semana</div>
+    <div class="stack" id="g-weeks">${weekInputs(goalWeeks({start, deadline}), w.map(x => (x || {}).text || ""))}</div>
+    <div class="group-label">¿Qué podría salir mal?</div><p class="muted" style="font-size:13px;margin-top:-6px">Imagina que llegó la fecha y no lo lograste. Escribe por qué y cómo lo evitas.</p>
+    ${[0,1,2].map(i => `<div class="stack" style="gap:6px;padding:10px;border-radius:12px;background:var(--surface)"><textarea class="auto" rows="1" id="g-pc${i}" placeholder="Riesgo ${i+1}. Ej: ${esc(PH_PM[i][0])}">${esc((pm[i] || {}).cause || "")}</textarea><textarea class="auto" rows="1" id="g-pk${i}" placeholder="Cómo lo evito">${esc((pm[i] || {}).counter || "")}</textarea></div>`).join("")}
+    <div class="group-label">Recompensas</div>
+    <label class="field" for="g-rm">A mitad de camino<textarea class="auto" rows="1" id="g-rm" placeholder="Ej: una salida corta">${esc(g.rewardMid || "")}</textarea></label>
+    <label class="field" for="g-re">Al lograr el objetivo<textarea class="auto" rows="1" id="g-re" placeholder="Ej: plan en familia">${esc(g.rewardEnd || "")}</textarea></label>`;
+}
+function readGoalFields(old = {}){
+  const el = id => document.getElementById(id), val = id => el(id) ? el(id).value.trim() : "";
+  const start = val("g-start"), deadline = val("g-deadline"), nW = goalWeeks({start, deadline}), fs = el("g-front");
+  return { frontId: fs && !fs.disabled ? fs.value : old.frontId, title:val("g-title"), why:val("g-why"), start, deadline,
+    standard:val("g-standard"), minimum:val("g-minimum"), trigger:val("g-trigger"),
+    weekly:Array.from({length:nW}, (_, i) => ({text:val("g-w" + i), done:!!((old.weekly || [])[i] || {}).done})),
+    premortem:[0,1,2].map(i => ({cause:val("g-pc" + i), counter:val("g-pk" + i)})), rewardMid:val("g-rm"), rewardEnd:val("g-re") };
+}
+function habitFields(h, key, opts = {}){
+  h = h || {};
+  const frontSel = opts.fixedFrontName ? fixedSelect("h-f-" + key, opts.fixedFrontName)
+    : `<select id="h-f-${key}"><option value="">Ningún frente (lo marco yo)</option>${S.fronts.slice().sort(byOrder).map(f => `<option value="${f.id}" ${h.frontId === f.id ? "selected" : ""}>${esc(f.name)}</option>`).join("")}</select>`;
+  return `
+    <label class="field" for="h-n-${key}">Nombre<input type="text" id="h-n-${key}" value="${esc(h.name || "")}" placeholder="Ej: THM" autocomplete="off"></label>
+    <label class="field" for="h-m-${key}">Mínimo<span class="hint">Lo que haces en un día malo para no romper la racha.</span><input type="text" id="h-m-${key}" value="${esc(h.minimum || "")}" placeholder="Ej: 15 minutos" autocomplete="off"></label>
+    <label class="field" for="h-s-${key}">Estándar<span class="hint">Lo ideal en un día normal.</span><input type="text" id="h-s-${key}" value="${esc(h.standard || "")}" placeholder="Ej: 45 minutos" autocomplete="off"></label>
+    <label class="field" for="h-f-${key}">Se marca solo al terminar una tarea de${frontSel}</label>
+    <div class="field">¿Qué días?${dayToggles("h-d-" + key, h.days || [1,2,3,4,5])}</div>`;
+}
+function readHabitFields(key){
+  const v = id => { const e = document.getElementById(id); return e ? e.value.trim() : ""; }, fs = document.getElementById("h-f-" + key);
+  return { name:v("h-n-" + key), minimum:v("h-m-" + key), standard:v("h-s-" + key), frontId: fs && !fs.disabled ? (fs.value || null) : undefined,
+    days:[...document.querySelectorAll("#h-d-" + key + " input:checked")].map(x => +x.value) };
+}
+function goalForm(id, fromId, frontId){
+  const g0 = id ? S.goals.find(x => x.id === id) : null;
+  const tpl = !g0 && fromId ? S.goals.find(x => x.id === fromId) : null;
+  const g = g0 || (tpl ? {...tpl, title:"", why:"", start:null, deadline:null, weekly:[]} : null);
+  openModal(() => sheet(g0 ? "Editar objetivo" : "Nuevo objetivo", `<form class="stack" data-form="goal" data-id="${g0 ? g0.id : ""}" style="gap:14px">
+    ${goalFields(g, {frontId})}
+    <button class="btn primary block" type="submit">Guardar objetivo</button></form>`), false);
+}
+function goalSheet(id){
+  openModal(() => {
+    const g = S.goals.find(x => x.id === id); if (!g) return "";
+    const del = confirmKey === "gdel-" + id;
+    return sheet("Objetivo", `<p style="font-weight:700">${esc(g.title)}</p>
+      <button class="opt" data-act="goal-edit" data-id="${id}">Editar</button>
+      <button class="opt" data-act="goal-dup" data-id="${id}"><span class="grow">Usar como plantilla<small>Crea uno nuevo con esta estructura</small></span></button>
+      <button class="opt danger" data-act="goal-del" data-id="${id}">${del ? "Toca otra vez para borrar" : "Borrar"}</button>`);
+  });
+}
+
+/* ----- hábitos ----- */
+function habitsEdit(){
+  openModal(() => sheet("Hábitos", `<p class="muted" style="font-size:14px">El mínimo debe ser tan pequeño que lo cumplas incluso en un mal día.</p>
+    ${habits().map(h => `<form class="card stack" data-form="habit" data-id="${h.id}" style="gap:14px">
+      ${habitFields(h, h.id)}
+      <div style="display:flex;gap:8px"><button class="btn primary small" type="submit">Guardar</button><button class="btn small danger" type="button" data-act="habit-del" data-id="${h.id}">Borrar</button></div>
+    </form>`).join("") || '<p class="empty">Aún no tienes hábitos.</p>'}
+    <button class="btn block" data-act="habit-new">Añadir hábito</button>`), false);
+}
+function habitEditOne(id){
+  const h = S.habits.find(x => x.id === id); if (!h) return;
+  openModal(() => sheet("Editar hábito", `<form class="stack" data-form="habit" data-id="${h.id}" data-close="1" style="gap:14px">
+    ${habitFields(h, h.id)}
+    <div style="display:flex;gap:8px"><button class="btn primary" style="flex:1" type="submit">Guardar</button><button class="btn danger" type="button" data-act="habit-del" data-id="${h.id}" data-close="1">Borrar</button></div></form>`), false);
+}
+function habitNew(){
+  openModal(() => sheet("Nuevo hábito", `<form class="stack" data-form="habit-new" style="gap:14px">
+    ${habitFields({days:[1,2,3,4,5]}, "new")}
+    <button class="btn primary block" type="submit">Crear hábito</button></form>`), false);
+}
+/* ----- ajustes ----- */
+function settingsSheet(){
+  openModal(() => {
+    const st = settings();
+    return sheet("Ajustes", `<form class="stack" data-form="settings" style="gap:14px">
+      <label class="field" for="s-time">Hora fija del bloque entre semana<span class="hint">Pon una alarma diaria en tu iPhone a esta hora.</span><input type="time" id="s-time" value="${esc(st.fixedTime || "")}"></label>
+      <label class="field" for="s-planb">Plan B: si salgo del trabajo después de…<span class="hint">Ese día solo haces el mínimo antes de dormir y la racha sigue viva.</span><input type="time" id="s-planb" value="${esc(st.planBTime || "")}"></label>
+      <button class="btn primary block" type="submit">Guardar</button></form>
+      <button class="text-btn muted" data-act="guide" style="justify-self:start">Ver guía completa</button>`);
+  }, false);
+}
+
+/* ----- guía ----- */
+function guideSheet(){
+  openModal(() => sheet("Guía", `<div class="guide stack">
+    <h3>Cómo se conecta todo</h3>
+    <ol><li><b>Visión</b> (Metas): hacia dónde vas en años.</li><li><b>Frente</b>: un proyecto, como THM o CCFA. Máximo 2 activos.</li><li><b>Objetivo</b> del frente: un resultado con inicio y fecha límite. Las semanas salen de esas fechas.</li><li><b>Tareas</b> del frente: lo que haces para cumplir la meta de esta semana.</li><li><b>Principal</b> (Hoy): la tarea que eliges para cada día.</li><li><b>Hábito</b> del frente: mide tu constancia y se marca solo al terminar una tarea de ese frente.</li></ol>
+    <h3>Empezar</h3>
+    <p>En Frentes toca <b>Crear frente</b>: te guía por tareas → objetivo → hábito. El objetivo y el hábito son opcionales.</p>
+    <h3>Cada día</h3>
+    <ol><li><b>Durante el día:</b> lo que se te ocurra va a la Bandeja.</li><li><b>Cada noche, 5 min:</b> en Hoy → <b>Planear mañana</b>. Vacías la Bandeja y eliges la principal de mañana y hasta 2 extras.</li><li><b>Al día siguiente:</b> toca ▶ en la principal, trabaja y marca la casilla. El hábito se marca solo.</li><li><b>Día malo:</b> si no terminas la principal, haz el mínimo y toca <b>Solo mínimo</b> en el hábito.</li></ol>
+    <h3>Cada domingo, 30 min</h3>
+    <ol><li>En Semana responde las 3 preguntas.</li><li>Marca si cumpliste la semana de cada objetivo y escribe qué debe estar hecho la próxima.</li><li>En Frentes escribe las tareas de esa semana.</li></ol>
+    <h3>Reglas</h3>
+    <ul><li>Una sola principal por día. Si la cumples, el día está ganado.</li><li>Nunca falles dos veces seguidas: después de un fallo, el mínimo es obligatorio.</li><li>Decide la noche anterior. De día solo ejecutas.</li><li>Si una tarea te da pereza, está mal definida: pártela.</li></ul>
+    <h3>Cómo escribir una tarea</h3>
+    <div class="tpl">[Verbo] + [qué exactamente] — [tiempo]
+Bien: Resolver la sala de THM sobre XSS — 60 min
+Mal: Avanzar en THM (no se puede empezar sin pensar)</div>
+    <h3>Cómo escribir el disparador</h3>
+    <div class="tpl">Cuando [algo que ya pasa], haré [acción] en [lugar].
+Ej: Cuando termine de cenar, abro el laboratorio en el escritorio.</div>
+    <h3>Cuando todo parece urgente</h3>
+    <ol><li>¿Hay una consecuencia real si no se hace hoy? → primero.</li><li>¿Me acerca a mi objetivo? → si no, a Congelados.</li><li>¿Hace las demás más fáciles? → esa es la principal.</li></ol>
+    <h3>Señales de alarma</h3>
+    <ul><li>2 días sin cumplir el mínimo (la app te avisa).</li><li>Ganas de abrir un frente nuevo sin cerrar otro.</li><li>Revisar la lista en vez de ejecutarla.</li></ul>
+    <p class="muted">Ante cualquiera: solo el mínimo hasta recuperar la racha.</p></div>`), false); modal.guard = false;
+}
+
+/* ----- asistente: nuevo frente → tareas → objetivo → hábito (con los formularios completos de cada módulo) ----- */
+const W = {};
+const MINS = m => [15,25,45,60,90].map(x => `<option value="${x}" ${x === m ? "selected" : ""}>${x} min</option>`).join("");
+const dayToggles = (id, days) => `<div class="days" id="${id}">${[1,2,3,4,5,6,0].map(dd => `<label class="day-tog"><input type="checkbox" name="d" value="${dd}" ${days.includes(dd) ? "checked" : ""}><span>${DAYS[dd]}</span></label>`).join("")}</div>`;
+const daysLabel = days => { const s = (days || []).slice().sort().join(","); return s === "1,2,3,4,5" ? "lunes a viernes" : s === "0,1,2,3,4,5,6" ? "todos los días" : s === "0,6" ? "fines de semana" : [1,2,3,4,5,6,0].filter(x => (days || []).includes(x)).map(x => DAYNAMES[x].slice(0,3)).join(", ") || "sin días"; };
+function wizardOpen(){
+  Object.assign(W, {step:0, name:"", note:"", tasks:[], goal:{weekly:[]}, wantHabit:null, habit:{name:"", minimum:"", standard:"", days:[1,2,3,4,5]}});
+  openModal(wizardRender, false);
+}
+function wzCapture(){
+  if (W.step === 1){ const i = $("#wz-task"); if (i && i.value.trim()){ W.tasks.push({title:i.value.trim(), minutes:+$("#wz-min").value}); i.value = ""; } }
+  if (W.step === 0){ const n = $("#wz-name"), o = $("#wz-note"); if (n) W.name = n.value.trim(); if (o) W.note = o.value.trim(); }
+  if (W.step === 2 && $("#g-title")) W.goal = readGoalFields(W.goal);
+  if (W.step === 3 && W.wantHabit && $("#h-n-w")) W.habit = {...W.habit, ...readHabitFields("w")};
+}
+function wzRedraw(){ $("#modal").innerHTML = wizardRender(); growAll(); const f = $("#modal [autofocus]"); if (f) f.focus(); $("#modal .sheet") && ($("#modal .sheet").scrollTop = 0); }
+function wizardRender(){
+  const names = ["Frente","Tareas","Objetivo","Hábito"];
+  const top = `<div class="steps">${names.map((_, i) => `<i class="${i <= W.step ? "on" : ""}"></i>`).join("")}</div><p class="wz-step">Paso ${W.step + 1} de 4 · ${names[W.step]}</p>`;
+  const nm = esc(W.name);
+  let body = "";
+  if (W.step === 0) body = `<h3 class="wz-q">¿En qué proyecto vas a trabajar?</h3>
+    <label class="field" for="wz-name">Nombre<input type="text" id="wz-name" value="${nm}" placeholder="Ej: THM Web" autocomplete="off" autofocus></label>
+    <label class="field" for="wz-note">Nota<span class="hint">Opcional. Ej: retomar cuando pase la CCFA.</span><input type="text" id="wz-note" value="${esc(W.note)}" autocomplete="off"></label>
+    ${active().length >= 2 ? '<p class="muted" style="font-size:13.5px">Ya tienes 2 frentes activos: este quedará en Congelados hasta que liberes uno.</p>' : ""}
+    <div class="wz-nav"><span></span><button class="btn primary" data-act="wz-next">Siguiente</button></div>`;
+  if (W.step === 1) body = `<h3 class="wz-q">¿Qué tareas tiene ${nm}?</h3>
+    <p class="muted" style="font-size:14px">Acciones concretas que empiecen con un verbo. Puedes añadir más después.</p>
+    <div class="list">${W.tasks.map((t, i) => `<div class="trow"><span class="plus">•</span><div class="tmain"><span class="ttitle">${esc(t.title)}</span><span class="tmeta">${t.minutes} min</span></div><button class="more" data-act="wz-task-del" data-i="${i}" aria-label="Quitar">${ICON.close}</button></div>`).join("")}
+    <form class="add-line" data-form="wz-task" ${W.tasks.length ? "" : 'style="border-top:0"'}><span class="plus">+</span><input type="text" id="wz-task" placeholder="Nueva tarea" autocomplete="off" autofocus><select id="wz-min" aria-label="Minutos">${MINS(45)}</select><button class="text-btn" type="submit">Añadir</button></form></div>
+    <div class="wz-nav"><button class="btn" data-act="wz-back">Atrás</button><button class="btn primary" data-act="wz-next">Siguiente</button></div>`;
+  if (W.step === 2) body = `<h3 class="wz-q">Objetivo de ${nm}</h3>
+    ${goalFields(W.goal, {fixedFrontName:W.name})}
+    <div class="wz-nav"><button class="btn" data-act="wz-back">Atrás</button><span style="display:flex;gap:8px"><button class="btn" data-act="wz-skip">Sin objetivo</button><button class="btn primary" data-act="wz-next">Siguiente</button></span></div>`;
+  if (W.step === 3){ const sum = join([`${W.tasks.length} ${W.tasks.length === 1 ? "tarea" : "tareas"}`, W.goal.title ? "1 objetivo" : "sin objetivo", W.wantHabit ? "1 hábito" : W.wantHabit === false ? "sin hábito" : ""]);
+    body = `<h3 class="wz-q">¿Quieres un hábito para ${nm}?</h3>
+    <p class="muted" style="font-size:14px">Te ayuda a ser constante. Se marca solo cada vez que terminas una tarea de ${nm}.</p>
+    <div class="stack"><button class="opt ${W.wantHabit === true ? "sel" : ""}" data-act="wz-habit" data-v="1"><span class="grow">Sí, crear hábito</span></button>
+      <button class="opt ${W.wantHabit === false ? "sel" : ""}" data-act="wz-habit" data-v="0"><span class="grow">No por ahora<small>Puedes añadirlo después</small></span></button></div>
+    ${W.wantHabit ? `<div class="stack" style="gap:14px">${habitFields(W.habit, "w", {fixedFrontName:W.name})}</div>` : ""}
+    ${W.wantHabit !== null ? `<p class="tmeta">Vas a crear <b style="color:var(--ink)">${nm}</b><span class="sep">·</span>${sum}</p>` : ""}
+    <div class="wz-nav"><button class="btn" data-act="wz-back">Atrás</button><button class="btn primary" data-act="wz-create" ${W.wantHabit === null ? "disabled" : ""}>Crear ${nm}</button></div>`; }
+  return sheet("Nuevo frente", top + body);
+}
+function wizardCreate(){
+  const fid = "f" + uid(), isAct = active().length < 2, now = Date.now();
+  put("fronts", {id:fid, name:W.name, note:W.note, status:isAct ? "active" : "frozen", order:isAct ? active().length + 1 : 50, created:now});
+  W.tasks.forEach((t, i) => put("tasks", {id:"t" + uid() + i, title:t.title, frontId:fid, minutes:t.minutes, slot:null, date:null, done:false, created:now + i}));
+  if (W.goal.title){ const {frontId, ...g} = W.goal; put("goals", {id:"g" + uid(), ...g, frontId:fid, created:now}); }
+  if (W.wantHabit){ const {frontId, ...h} = W.habit; put("habits", {id:"h" + uid(), ...h, name:h.name || W.name, frontId:fid, log:{}, order:S.habits.length + 1, created:today()}); }
+  closeModal(); if (view !== "frentes"){ view = "frentes"; try { localStorage.setItem("ej-view", view); } catch(e){} }
+  sched(); toast(isAct ? `${W.name} listo.` : `${W.name} creado en Congelados.`);
+}
+/* hábito para un frente que no lo tiene: el mismo formulario del módulo */
+function habitQuick(fid){
+  const f = front(fid); if (!f) return;
+  openModal(() => sheet(`Hábito para ${esc(f.name)}`, `<form class="stack" data-form="habit-quick" data-front="${fid}" style="gap:14px">
+    ${habitFields({name:f.name, days:[1,2,3,4,5]}, "q", {fixedFrontName:f.name})}
+    <button class="btn primary block" type="submit">Crear hábito</button></form>`), false);
+}
+
+/* ----- plan de noche ----- */
+const NP = { step:0, p1:null, p2:[] };
+function nightOpen(){
+  const tm = addDays(today(), 1), c = crit(tm);
+  NP.step = 0; NP.p1 = c ? c.id : null; NP.p2 = secs(tm).map(t => t.id);
+  openModal(nightRender);
+}
+function nightRender(){
+  const tm = addDays(today(), 1);
+  const bar = `<div class="steps">${[0,1,2,3].map(i => `<i class="${i <= NP.step ? "on" : ""}"></i>`).join("")}</div>`;
+  const cand = active().map(f => {
+    const ts = S.tasks.filter(t => t.frontId === f.id && !t.done && !(t.slot && t.date && t.date !== tm && t.date >= today()));
+    return ts.length ? `<div class="group-label">${esc(f.name)}</div>` + ts.map(t => `<button class="opt ${NP.step === 1 ? (NP.p1 === t.id ? "sel" : "") : (NP.p2.includes(t.id) ? "sel" : "")}" data-act="np-pick" data-id="${t.id}" ${NP.step === 2 && NP.p1 === t.id ? "disabled style=\"opacity:.4\"" : ""}><span class="grow">${esc(t.title)}<small>${t.minutes ? t.minutes + " min" : ""}</small></span>${exB(t)}</button>`).join("") : "";
+  }).join("");
+  let body = "";
+  if (NP.step === 0){
+    const items = inbox();
+    body = `<p class="wz-step">Paso 1 de 4</p><h3 style="font-size:19px">Vacía la Bandeja</h3>
+      ${items.length ? `<div class="stack">${items.map(t => `<div class="card" style="gap:8px;padding:12px"><b>${esc(t.title)}</b> ${exB(t)}<div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${active().map(f => `<button class="btn small" data-act="move" data-id="${t.id}" data-front="${f.id}" data-stay="1">${esc(f.name)}</button>`).join("")}
+        ${frozen()[0] ? `<button class="btn small" data-act="move" data-id="${t.id}" data-front="${(frozen().find(f => /alg[uú]n d[ií]a/i.test(f.name)) || frozen()[0]).id}" data-stay="1">Congelar</button>` : ""}
+        <button class="btn small" data-act="inbox-done" data-id="${t.id}" data-stay="1">Hecho</button>
+        <button class="btn small danger" data-act="np-del" data-id="${t.id}">Borrar</button></div></div>`).join("")}</div>`
+      : '<p class="empty">Bandeja vacía. Sigue al paso 2.</p>'}
+      <button class="btn primary block" data-act="np-next">${items.length ? "Seguir con lo que queda" : "Siguiente"}</button>`;
+  } else if (NP.step === 1){
+    body = `<p class="wz-step">Paso 2 de 4 · ${fmt(tm,{weekday:"long", day:"numeric"})}</p><h3 style="font-size:19px">Elige la principal de mañana</h3>
+      <p class="muted" style="font-size:13.5px">1) ¿Tiene consecuencia real? 2) ¿Te acerca a tu objetivo? 3) ¿Hace las demás más fáciles?</p>
+      ${cand || '<p class="muted">No hay tareas en tus frentes activos.</p><button class="btn" data-act="nav" data-v="frentes">Ir a Frentes a escribir tareas</button>'}
+      <div style="display:flex;gap:8px"><button class="btn" data-act="np-back">Atrás</button><button class="btn primary" style="flex:1" data-act="np-next" ${NP.p1 ? "" : "disabled"}>Siguiente</button></div>`;
+  } else if (NP.step === 2){
+    body = `<p class="wz-step">Paso 3 de 4</p><h3 style="font-size:19px">Extras (opcional, máximo 2)</h3>
+      <p class="muted" style="font-size:13.5px">${NP.p2.length}/2 elegidos. Si solo cumples la principal, el día ya cuenta.</p>
+      ${cand}
+      <div style="display:flex;gap:8px"><button class="btn" data-act="np-back">Atrás</button><button class="btn primary" style="flex:1" data-act="np-save">Guardar plan</button></div>`;
+  } else {
+    const c = task(NP.p1), st = settings();
+    body = `<p class="wz-step">Paso 4 de 4</p><h3 style="font-size:19px">Déjala preparada</h3>
+      <div class="ticket"><div class="tk-top"><span class="tk-front">Principal de mañana</span></div><h3 class="tk-title">${esc(c ? c.title : "")}</h3></div>
+      <p style="font-size:14.5px">Antes de dormir, deja abierta la pestaña, el archivo o el cuaderno que necesitas. Mañana${st.fixedTime ? ` a las <b>${esc(st.fixedTime)}</b>` : ""} no decides nada: solo ejecutas.</p>
+      ${st.planBTime ? `<p class="muted" style="font-size:13.5px">Si sales después de las ${esc(st.planBTime)}, solo el mínimo.</p>` : ""}
+      <button class="btn primary block" data-act="close">Listo</button>`;
+  }
+  return sheet("Planear mañana", bar + body);
+}
+
+/* ================= enfoque ================= */
+const F = { id:null, total:25*60, remain:25*60, endAt:0, running:false, timer:null, logged:0, finished:false, lock:null };
+function focusOpen(id){
+  const t = task(id), m = (t && t.minutes) || 25;
+  Object.assign(F, { id, base:m, total:m*60, remain:m*60, running:false, finished:false, logged:0 });
+  renderFocus();
+}
+function renderFocus(){
+  const t = task(F.id); if (!F.id){ $("#focus").innerHTML = ""; return; }
+  const m = Math.floor(F.remain/60), s = Math.floor(F.remain%60);
+  const C = 2*Math.PI*54, frac = F.total ? F.remain/F.total : 0;
+  $("#focus").innerHTML = `<div class="focus" role="dialog" aria-modal="true" aria-label="Enfoque"><div class="focus-in">
+    <p class="eyebrow">Enfoque</p>
+    <h2>${esc(t ? t.title : "")}</h2>
+    ${F.finished ? `<p style="font-size:18px;font-weight:700">Sesión terminada.</p><p class="focus-note">¿Terminaste la tarea?</p>
+      <div class="presets"><button class="btn go" data-act="focus-finish" data-done="1">Sí, marcar hecha</button><button class="btn" data-act="focus-finish">Seguir otro día</button></div>`
+    : `<div class="ring"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="54" fill="none" stroke="var(--ticket-line)" stroke-width="6"/><circle id="ringArc" cx="60" cy="60" r="54" fill="none" stroke="var(--p1)" stroke-width="6" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C*(1-frac)}"/></svg><div class="time" id="ringTime">${pad(m)}:${pad(s)}</div></div>
+      ${F.running || F.remain < F.total ? "" : `<div class="adjust"><button data-act="focus-adj" data-n="-5" aria-label="Quitar 5 minutos">−5</button><span>${Math.round(F.total/60)} min</span><button data-act="focus-adj" data-n="5" aria-label="Añadir 5 minutos">+5</button></div>
+      <div class="presets">${[...new Set([10, F.base, 25, 50])].sort((a,b) => a-b).map(n => `<button class="${F.total === n*60 ? "on" : ""}" data-act="focus-preset" data-n="${n}">${n === F.base ? `${n} min · tarea` : `${n} min`}</button>`).join("")}</div>`}
+      <div class="presets"><button class="btn go" data-act="focus-toggle">${F.running ? "Pausar" : (F.remain < F.total ? "Seguir" : "Empezar")}</button><button class="btn" data-act="focus-stop">Terminar</button></div>
+      <p class="focus-note">${F.total === 600 ? "Regla de los 10 minutos: solo te comprometes a empezar. Si al final quieres parar, paras y cuenta." : "Teléfono en otra habitación. Una sola pestaña abierta."}</p>`}
+  </div></div>`;
+}
+function tick(){
+  F.remain = Math.max(0, (F.endAt - Date.now())/1000);
+  const el = $("#ringTime"), arc = $("#ringArc");
+  if (el){ const m = Math.floor(Math.ceil(F.remain)/60), s = Math.ceil(F.remain)%60; el.textContent = `${pad(m)}:${pad(s)}`; }
+  if (arc){ const C = 2*Math.PI*54; arc.setAttribute("stroke-dashoffset", C*(1 - F.remain/F.total)); }
+  if (F.remain <= 0){ stopTimer(); logFocus(); F.finished = true; chime(); renderFocus(); }
+}
+function startTimer(){
+  F.endAt = Date.now() + F.remain*1000; F.running = true;
+  clearInterval(F.timer); F.timer = setInterval(tick, 250);
+  try { navigator.wakeLock && navigator.wakeLock.request("screen").then(l => F.lock = l).catch(() => {}); } catch(e){}
+}
+function stopTimer(){ F.running = false; clearInterval(F.timer); try { F.lock && F.lock.release(); } catch(e){} F.lock = null; }
+function logFocus(){
+  const mins = Math.floor((F.total - F.remain)/60) - F.logged;
+  if (mins < 1) return;
+  F.logged += mins;
+  const days = {...(S.focus.days || {})}; const d = today(); days[d] = (days[d] || 0) + mins;
+  putMeta("focus", {days});
+}
+function chime(){
+  try { const A = new (window.AudioContext || window.webkitAudioContext)(); [0, .25, .5].forEach((t, i) => { const o = A.createOscillator(), g = A.createGain(); o.frequency.value = [660, 880, 990][i]; g.gain.setValueAtTime(.0001, A.currentTime + t); g.gain.exponentialRampToValueAtTime(.25, A.currentTime + t + .02); g.gain.exponentialRampToValueAtTime(.0001, A.currentTime + t + .35); o.connect(g).connect(A.destination); o.start(A.currentTime + t); o.stop(A.currentTime + t + .4); }); } catch(e){}
+}
+
+/* ================= toast ================= */
+let toastT;
+function toast(msg){
+  $("#toastRoot").innerHTML = `<div class="toast" role="status">${esc(msg)}</div>`;
+  clearTimeout(toastT); toastT = setTimeout(() => { $("#toastRoot").innerHTML = ""; }, 2600);
+}
+
+/* ================= acciones ================= */
+function confirmTap(key){ if (confirmKey === key){ confirmKey = null; return true; } confirmKey = key; sched(); setTimeout(() => { if (confirmKey === key){ confirmKey = null; sched(); } }, 4000); return false; }
+const A = {
+  nav(d){ view = d.v; try { localStorage.setItem("ej-view", view); } catch(e){} closeModal(); render(); window.scrollTo(0,0); },
+  close(){ closeModal(); },
+  scrim(d, el, e){ if (e.target === el && !modal.guard) closeModal(); },
+  guide(){ guideSheet(); },
+  settings(){ settingsSheet(); },
+  done(d){ toggleDone(d.id); if (modal.render && !$("#modal .steps")) closeModal(); },
+  focus(d){ closeModal(); focusOpen(d.id); },
+  "task-sheet"(d){ confirmKey = null; taskSheet(d.id); },
+  "move-sheet"(d){ confirmKey = null; moveSheet(d.id); },
+  "task-edit"(d){ taskEdit(d.id); },
+  "task-del"(d){ if (confirmTap("del-" + d.id)){ remove("tasks", d.id); closeModal(); toast("Tarea borrada."); } },
+  move(d){ const t = task(d.id); if (!t) return; const f = front(d.front); put("tasks", {...t, frontId: d.front || null, ...(f && f.status !== "active" ? {date:null, slot:null} : {})}); if (!d.stay) closeModal(); toast(f ? `Movida a ${f.name}.` : "De vuelta en la Bandeja."); },
+  assign(d){ if (assign(d.id, d.date, d.slot)) closeModal(); },
+  unassign(d){ unassign(d.id); closeModal(); },
+  carry(d){ const t = task(d.id); if (!t) return; const slot = t.slot === "critical" && !crit(today()) ? "critical" : "secondary"; assign(d.id, today(), slot); },
+  pick(d){ pickSheet(d.date, d.slot); },
+  "pick-do"(d){ if (assign(d.id, d.date, d.slot)) closeModal(); },
+  "inbox-done"(d){ const t = task(d.id); if (!t) return; if (t.slot){ toggleDone(d.id); return; } remove("tasks", d.id); toast("Hecho y fuera de la Bandeja."); },
+  hlog(d){ const h = S.habits.find(x => x.id === d.id); if (!h) return; const log = {...(h.log || {})}; const day = today();
+    if (log[day] === d.k) delete log[day]; else log[day] = d.k; put("habits", {...h, log});
+    if (log[day]) toast("Mínimo cumplido. La racha sigue viva."); },
+  "habits-edit"(){ confirmKey = null; habitsEdit(); },
+  "habit-new"(){ habitNew(); },
+  "habit-edit"(d){ habitEditOne(d.id); },
+  hcheck(d){ const h = S.habits.find(x => x.id === d.id); if (!h) return; const log = {...(h.log || {})}; const day = today();
+    if (log[day] === "min") log[day] = "full"; else if (log[day]) delete log[day]; else log[day] = "full"; put("habits", {...h, log}); if (log[day]) toast("Hábito cumplido."); },
+  help(d){ helpSheet(d.k); },
+  vision(){ const st = settings(); openModal(() => sheet("Visión", `<form class="stack" data-form="vision" style="gap:14px"><label class="field" for="v-text">Hacia dónde vas en los próximos años<span class="hint">Una o dos frases. Solo da dirección.</span><textarea class="auto" rows="2" id="v-text" placeholder="Ej: libertad financiera y trabajar de forma independiente">${esc(st.vision || "")}</textarea></label><button class="btn primary block" type="submit">Guardar</button></form>`), false); },
+  "habit-del"(d, el){ const k = "hdel-" + d.id;
+    if (confirmKey !== k){ confirmKey = k; el.textContent = "Toca otra vez"; setTimeout(() => { if (confirmKey === k){ confirmKey = null; if (el.isConnected) el.textContent = "Borrar"; } }, 4000); return; }
+    confirmKey = null; remove("habits", d.id); toast("Hábito borrado."); if (d.close) closeModal(); else setTimeout(habitsEdit, 60); },
+  night(){ nightOpen(); },
+  "np-next"(){ NP.step = Math.min(3, NP.step + 1); sched(); },
+  "np-back"(){ NP.step = Math.max(0, NP.step - 1); sched(); },
+  "np-del"(d){ remove("tasks", d.id); },
+  "np-pick"(d){ if (NP.step === 1){ NP.p1 = d.id; NP.p2 = NP.p2.filter(x => x !== d.id); }
+    else { if (NP.p2.includes(d.id)) NP.p2 = NP.p2.filter(x => x !== d.id); else if (NP.p2.length < 2) NP.p2.push(d.id); else toast("Máximo 2 extras."); } sched(); },
+  "np-save"(){
+    const tm = addDays(today(), 1);
+    S.tasks.filter(t => t.date === tm && t.slot && t.id !== NP.p1 && !NP.p2.includes(t.id)).forEach(t => put("tasks", {...t, date:null, slot:null}));
+    const p1 = task(NP.p1); if (p1) put("tasks", {...p1, date:tm, slot:"critical", done:false});
+    NP.p2.forEach(id => { const t = task(id); if (t) put("tasks", {...t, date:tm, slot:"secondary", done:false}); });
+    NP.step = 3; sched();
+  },
+  "front-sheet"(d){ confirmKey = null; frontSheet(d.id); },
+  "front-new"(){ confirmKey = null; wizardOpen(); },
+  "wz-next"(){ wzCapture();
+    if (W.step === 0 && !W.name){ toast("Escribe el nombre del proyecto."); return; }
+    if (W.step === 2 && W.goal.title && (!W.goal.start || !W.goal.deadline)){ toast("Pon la fecha de inicio y la fecha límite."); return; }
+    if (W.step === 2 && W.goal.title && W.goal.deadline < W.goal.start){ toast("La fecha límite debe ser después del inicio."); return; }
+    W.step = Math.min(3, W.step + 1); wzRedraw(); },
+  "wz-back"(){ wzCapture(); W.step = Math.max(0, W.step - 1); wzRedraw(); },
+  "wz-skip"(){ wzCapture(); W.goal = {...W.goal, title:""}; W.step = 3; wzRedraw(); },
+  "wz-task-del"(d){ W.tasks.splice(+d.i, 1); wzRedraw(); },
+  "wz-habit"(d){ wzCapture(); W.wantHabit = d.v === "1"; if (W.wantHabit && !W.habit.name) W.habit.name = W.name; wzRedraw(); },
+  "wz-create"(){ wzCapture(); if (W.wantHabit && !W.habit.days.length){ toast("Elige al menos un día para el hábito."); return; } wizardCreate(); },
+  "habit-quick"(d){ habitQuick(d.front); },
+  "front-freeze"(d){ const f = front(d.id); if (f){ put("fronts", {...f, status:"frozen"}); closeModal(); toast(S.habits.some(h => h.frontId === f.id) ? `${f.name} congelado. Su hábito queda en pausa.` : `${f.name} congelado.`); } },
+  "front-activate"(d){ const f = front(d.id); if (!f) return; if (active().length >= 2){ toast("Ya tienes 2 frentes activos. Congela uno primero."); return; } put("fronts", {...f, status:"active", order: active().length + 1}); closeModal(); toast(`${f.name} activado.`); },
+  "front-del"(d){ if (confirmTap("fdel-" + d.id)){ S.tasks.filter(t => t.frontId === d.id).forEach(t => t.done ? put("tasks", {...t, frontId:null, archived:true}) : remove("tasks", t.id)); S.goals.filter(g => g.frontId === d.id).forEach(g => remove("goals", g.id)); S.habits.filter(h => h.frontId === d.id).forEach(h => remove("habits", h.id)); remove("fronts", d.id); closeModal(); toast("Frente borrado."); } },
+  "goal-new"(d){ goalForm(null, null, d && d.front); },
+  "goal-sheet"(d){ confirmKey = null; goalSheet(d.id); },
+  "goal-edit"(d){ goalForm(d.id); },
+  "goal-dup"(d){ goalForm(null, d.id); },
+  "goal-del"(d){ if (confirmTap("gdel-" + d.id)){ remove("goals", d.id); closeModal(); } },
+  "goal-week"(d){ const g = S.goals.find(x => x.id === d.id); if (!g) return; const w = Array.from({length:Math.max(goalWeeks(g), (g.weekly || []).length)}, (_, i) => ({text:"", done:false, ...((g.weekly || [])[i] || {})})); w[+d.i].done = !w[+d.i].done; put("goals", {...g, weekly:w}); },
+  "review-close"(){ saveReview(true); toast("Revisión guardada. Ahora escribe en Frentes las tareas de la semana."); }
+};
+
+document.addEventListener("click", e => {
+  const el = e.target.closest("[data-act]"); if (!el || el.disabled) return;
+  const fn = A[el.dataset.act]; if (!fn) return;
+  if (el.tagName === "A") e.preventDefault();
+  fn(el.dataset, el, e);
+});
+
+/* ----- formularios ----- */
+const FORMS = {
+  capture(f){ const i = $("#cap"); const v = i.value.trim(); if (!v) return; put("tasks", {id:"t" + uid(), title:v, frontId:null, minutes:null, slot:null, date:null, done:false, created:Date.now()}); i.value = ""; toast("Capturado."); },
+  "add-task"(f){ const fid = f.dataset.front, i = document.getElementById("add-" + fid), m = +document.getElementById("min-" + fid).value; const v = i.value.trim(); if (!v) return;
+    put("tasks", {id:"t" + uid(), title:v, frontId:fid, minutes:m, slot:null, date:null, done:false, created:Date.now()}); i.value = "";
+    toast(m > 60 ? "Añadida. Más de 60 min suele ser demasiado: considera partirla." : "Tarea añadida."); },
+  "task-edit"(f){ const t = task(f.dataset.id); if (!t) return; const v = $("#te-title").value.trim(); if (!v) return; put("tasks", {...t, title:v, minutes:+$("#te-min").value || null}); closeModal(); },
+  "pick-new"(f){ const v = $("#pn-title").value.trim(); if (!v) return; const id = "t" + uid();
+    const t = {id, title:v, frontId:$("#pn-front").value || null, minutes:+$("#pn-min").value, slot:null, date:null, done:false, created:Date.now()};
+    const date = f.dataset.date, slot = f.dataset.slot;
+    if (slot === "secondary" && secs(date).length >= 2){ toast("Ese día ya tiene 2 extras."); return; }
+    if (slot === "critical"){ const cur = crit(date); if (cur && cur.done){ toast("La principal de ese día ya está hecha. Créala como extra."); return; } if (cur) put("tasks", {...cur, date:null, slot:null}); }
+    put("tasks", {...t, date, slot}); closeModal(); toast("Creada y programada."); },
+  "wz-task"(f){ const i = $("#wz-task"), v = i.value.trim(); if (!v) return; W.tasks.push({title:v, minutes:+$("#wz-min").value}); wzRedraw(); },
+  "habit-quick"(f){ const fr = front(f.dataset.front); if (!fr) return; const v = readHabitFields("q");
+    if (!v.days.length){ toast("Elige al menos un día."); return; }
+    put("habits", {id:"h" + uid(), ...v, name:v.name || fr.name, frontId:fr.id, log:{}, order:S.habits.length + 1, created:today()}); closeModal(); toast("Hábito creado."); },
+  "front-rename"(f){ const fr = front(f.dataset.id); if (!fr) return; const v = $("#fr-name").value.trim(); if (!v) return; put("fronts", {...fr, name:v, note:$("#fr-note").value.trim()}); closeModal(); },
+  goal(f){
+    const id = f.dataset.id || "g" + uid(); const old = S.goals.find(x => x.id === id) || {};
+    const v = readGoalFields(old);
+    if (!v.start || !v.deadline){ toast("Pon la fecha de inicio y la fecha límite."); return; }
+    if (v.deadline < v.start){ toast("La fecha límite debe ser después del inicio."); return; }
+    if (!v.title){ toast("Escribe el objetivo."); return; }
+    put("goals", {...old, ...v, id, example:false, created:old.created || Date.now()});
+    closeModal(); toast("Objetivo guardado."); },
+  habit(f){ const h = S.habits.find(x => x.id === f.dataset.id); if (!h) return;
+    const v = readHabitFields(h.id); if (!v.days.length){ toast("Elige al menos un día."); return; }
+    put("habits", {...h, ...v, name:v.name || h.name}); toast("Hábito guardado."); if (f.dataset.close) closeModal(); },
+  "habit-new"(f){ const v = readHabitFields("new"); if (!v.name){ toast("Ponle un nombre al hábito."); return; } if (!v.days.length){ toast("Elige al menos un día."); return; }
+    put("habits", {id:"h" + uid(), ...v, log:{}, order:S.habits.length + 1, created:today()}); closeModal(); toast("Hábito creado."); },
+  vision(f){ putMeta("settings", {...settings(), vision:$("#v-text").value.trim()}); closeModal(); toast("Visión guardada."); },
+  settings(f){ const st = settings(); 
+    putMeta("settings", {...st, fixedTime:$("#s-time").value, planBTime:$("#s-planb").value}); closeModal(); toast("Ajustes guardados."); }
+};
+document.addEventListener("submit", e => {
+  const f = e.target.closest("[data-form]"); if (!f) return;
+  e.preventDefault(); const fn = FORMS[f.dataset.form]; if (fn) fn(f);
+});
+
+/* ----- revisión semanal: guardado automático ----- */
+let rvT;
+function saveReview(close){
+  const mon = monday(today()); const old = S.reviews.find(r => r.id === mon) || {};
+  const g = (id) => { const el = document.getElementById(id); return el ? el.value : undefined; };
+  document.querySelectorAll("[data-week-goal]").forEach(i => {
+    const g = S.goals.find(x => x.id === i.dataset.weekGoal); if (!g) return; const k = +i.dataset.i; const v = i.value.trim();
+    const w = Array.from({length:Math.max(goalWeeks(g), (g.weekly || []).length)}, (_, j) => ({text:"", done:false, ...((g.weekly || [])[j] || {})}));
+    if (w[k] && w[k].text !== v){ w[k].text = v; put("goals", {...g, weekly:w}); }
+  });
+  const next = {...old, id:mon, done:g("rv-done") ?? old.done ?? "", blocked:g("rv-blocked") ?? old.blocked ?? "", change:g("rv-change") ?? old.change ?? "",
+    inbox: $("#rv-inbox") ? $("#rv-inbox").checked : !!old.inbox, frozen: $("#rv-frozen") ? $("#rv-frozen").checked : !!old.frozen, closed: close ? true : !!old.closed};
+  put("reviews", next);
+}
+document.addEventListener("input", e => {
+  if (e.target.matches("textarea.auto")) autoGrow(e.target);
+  if (e.target.matches("[data-review],[data-week-goal]")){ clearTimeout(rvT); rvT = setTimeout(() => saveReview(false), 900); }
+});
+document.addEventListener("change", e => {
+  if (e.target.matches("[data-review-check]")) saveReview(false);
+  if (e.target.matches("#g-start,#g-deadline")){
+    const st = $("#g-start").value, dl = $("#g-deadline").value, box = $("#g-weeks"); if (!box || !st || !dl) return;
+    if (dl < st){ toast("La fecha límite debe ser después del inicio."); return; }
+    const vals = [...box.querySelectorAll("textarea, input")].map(i => i.value);
+    box.innerHTML = weekInputs(goalWeeks({start:st, deadline:dl}), vals); growAll();
+  }
+});
+
+/* ----- enfoque: acciones ----- */
+Object.assign(A, {
+  "focus-preset"(d){ F.total = F.remain = +d.n * 60; renderFocus(); },
+  "focus-adj"(d){ const m = Math.max(5, Math.min(180, Math.round(F.total/60) + +d.n)); F.total = F.remain = m * 60; renderFocus(); },
+  "focus-toggle"(){ if (F.running){ stopTimer(); F.remain = Math.max(0, (F.endAt - Date.now())/1000); logFocus(); } else startTimer(); renderFocus(); },
+  "focus-stop"(){ if (F.running){ F.remain = Math.max(0, (F.endAt - Date.now())/1000); stopTimer(); } logFocus(); F.finished = true; renderFocus(); },
+  "focus-finish"(d){ if (d.done){ const t = task(F.id); if (t && !t.done) toggleDone(F.id); } F.id = null; renderFocus(); }
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape" && modal.render && !modal.guard) closeModal(); });
+document.addEventListener("visibilitychange", () => { if (!document.hidden && F.running) tick(); });
+
+/* ================= arranque ================= */
+let lastDay = today();
+setInterval(() => { if (today() !== lastDay){ lastDay = today(); sched(); } }, 60000);
+async function init(){
+  render();
+  let d = null;
+  try { d = window.claude && window.claude.use ? await window.claude.use("db") : null; } catch(e){ d = null; }
+  if (!d){ mode = "local"; render(); return; }
+  db = d; mode = "db";
+  const onErr = e => { if (e && e.code === "revoked") toast("Se perdió el acceso. Recarga la página."); else toast("Se interrumpió la sincronización. Recarga la página."); };
+  ["tasks","fronts","goals","habits","reviews"].forEach(c => {
+    db.collection(c).onSnapshot(s => { S[c] = s.docs.map(x => ({id:x.id, ...x.data()})); ready.add(c); sched(); }, onErr);
+  });
+  ["settings","focus"].forEach(k => {
+    db.doc("meta/" + k).onSnapshot(s => { S[k] = s.exists ? {...s.data()} : (k === "focus" ? {days:{}} : {}); ready.add(k); sched(); }, onErr);
+  });
+  render();
+}
+init();
+})();
+</script>
