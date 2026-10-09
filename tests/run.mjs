@@ -393,6 +393,39 @@ console.log('\nUn solo mínimo y estándar');
   s = await store(p); ok(s.habits[0].minimum === '10 min' && !s.goals[0].minimum, 'queda un solo mínimo, en el hábito'); await p.close();
 }
 
+// ---------- 5c. tu bloque y el Plan B ----------
+console.log('\nTu bloque y el Plan B');
+{
+  const st = { 'meta/settings':{ fixedTime:'19:30', planBTime:'21:00' }, 'meta/focus':{ days:{} }, 'fronts/p1':{ name:'CCFA', status:'active', order:1, created:1 },
+    'tasks/t1':{ title:'Repasar detecciones', frontId:'p1', minutes:45, slot:'critical', date:TODAY, done:false, created:1 } };
+  for (const scheme of ['light', 'dark']){
+    // reloj simulado que avanza: 20:58 → 21:01, la línea cambia sola
+    const p = await b.newPage({ viewport:{ width:390, height:860 }, colorScheme:scheme }); p.errs = []; p.on('pageerror', e => p.errs.push(e.message));
+    await p.clock.install({ time:new Date('2026-10-08T20:58:00') }); await p.addInitScript(s => { window.__SEED = s; }, st);
+    await p.goto('file://' + page); await p.clock.runFor(500); await p.waitForSelector('.sec-head');
+    const line = () => p.locator('.day-line').first().textContent();
+    ok(/Tu bloque: 7:30\s?p\.\s?m\./.test(await line()), `${scheme}: debajo de la fecha dice "Tu bloque: 7:30 p. m." (${await line()})`);
+    await p.screenshot({ path:path.join(out, `hoy-bloque-${scheme}.png`) });
+    await p.clock.runFor(3 * 60000); await p.clock.runFor(200);
+    ok(/Plan B activo: hoy solo el mínimo/.test(await line()) && await p.locator('.day-line.warn').count() === 1, `${scheme}: al pasar las 9:00 p. m. cambia a "Plan B activo" en rojo`);
+    await p.screenshot({ path:path.join(out, `hoy-planb-${scheme}.png`) });
+    await p.click('.main-task [data-act=done]'); await p.clock.runFor(200);
+    ok(/Tu bloque/.test(await line()), `${scheme}: con la Principal hecha vuelve a "Tu bloque"`);
+    ok(!p.errs.length, `${scheme}: sin errores ${p.errs.join('|')}`); await p.close();
+  }
+  // sábado: no aparece
+  let p = await b.newPage({ viewport:{ width:390, height:860 } }); await p.clock.setFixedTime(new Date('2026-10-10T18:00:00'));
+  await p.addInitScript(s => { window.__SEED = s; }, st); await p.goto('file://' + page); await p.waitForSelector('.sec-head');
+  ok(await p.locator('.day-line').count() === 0, 'el fin de semana no aparece la línea'); await p.close();
+  // sin hora fija: recuadro para elegirla, que abre Ajustes
+  p = await open('light', { 'meta/settings':{}, 'meta/focus':{ days:{} } });
+  ok(/Elegir tu hora fija/.test(await p.locator('.day-line').textContent()), 'sin hora fija aparece "+ Elegir tu hora fija"');
+  await p.click('.day-line .dash'); ok(await p.locator('#s-time').count() === 1, 'el recuadro abre Ajustes'); await p.close();
+  // Plan B sin hora fija, pasada la hora: igual avisa
+  p = await open('light', { 'meta/settings':{ planBTime:'19:00' }, 'meta/focus':{ days:{} } });
+  ok(/Plan B activo/.test(await p.locator('.day-line').textContent()), 'el Plan B avisa aunque no haya hora fija'); await p.close();
+}
+
 // ---------- 6. copia de seguridad ----------
 console.log('\nCopia de seguridad');
 {

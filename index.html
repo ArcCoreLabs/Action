@@ -419,6 +419,8 @@ ul.help{font-size:14px}
 .ticket{padding:12px 14px}
 .tk-title{font-size:15.5px;line-height:1.3}
 .wz-step{font-size:10.5px}
+.day-line{margin-top:-2px}
+.day-line .dash{min-height:36px;font-size:13px}
 </style>
 
 
@@ -771,6 +773,17 @@ function taskRow(t, opts = {}){
   </div>`;
 }
 
+/* ---------- tu bloque y el Plan B (debajo de la fecha, de lunes a viernes) ---------- */
+const fmtHour = hm => { const [h, m] = String(hm).split(":").map(Number); const x = new Date(); x.setHours(h, m || 0, 0, 0); return new Intl.DateTimeFormat("es-CO", {hour:"numeric", minute:"2-digit"}).format(x); };
+function dayLine(){ // "block" · "planb" · "pick" · "" (fin de semana)
+  const d = today(), w = dow(d), st = settings(), c = crit(d);
+  if (w === 0 || w === 6) return {k:"", html:""};
+  const now = new Date(), hm = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  if (st.planBTime && hm >= st.planBTime && !(c && c.done)) return {k:"planb", html:'<p class="notice warn day-line"><span>Plan B activo: hoy solo el mínimo</span></p>'};
+  if (st.fixedTime) return {k:"block", html:`<p class="notice day-line"><span>Tu bloque: ${esc(fmtHour(st.fixedTime))}</span></p>`};
+  return {k:"pick", html:`<div class="day-line">${dash("Elegir tu hora fija", "settings")}</div>`};
+}
+
 /* ================= VISTAS ================= */
 const VIEWS = {};
 
@@ -823,6 +836,7 @@ VIEWS.hoy = function(){
 
   return `
   <div class="sec-head page"><h1 class="date-title">${cap(fmt(d, {weekday:"long", day:"numeric", month:"long"}))}</h1></div>
+  ${dayLine().html}
   ${nt.length ? `<div class="notices">${nt.slice(0, 4 + (!alarm.length && wilting.length && once.length ? 1 : 0)).join("")}</div>` : ""}
   <section class="block">${head("Principal", "principal")}${main}</section>
   <section class="block">${head("Extras", "extras", `<span class="count">${s.length}/2</span>`)}<div class="list">${extras}</div></section>
@@ -962,7 +976,7 @@ VIEWS.semana = function(){
 
 /* ----- ayuda "!" de cada apartado ----- */
 const HELP = {
-  principal:["Principal", ["La tarea más importante del día. Solo una.", "Elígela la noche anterior en <b>Mañana</b>.", "Toca <b>▶</b> para empezar un temporizador. Si estás cansado, empieza con 10 minutos.", "Marca la casilla al terminar: con eso el día ya cuenta."]],
+  principal:["Principal", ["La tarea más importante del día. Solo una.", "Elígela la noche anterior en <b>Mañana</b>.", "Toca <b>▶</b> para empezar un temporizador. Si estás cansado, empieza con 10 minutos.", "Marca la casilla al terminar: con eso el día ya cuenta.", "Debajo de la fecha ves <b>tu bloque</b>, de lunes a viernes. Si pasa tu hora de <b>Plan B</b> sin la Principal hecha, la app te dice: hoy solo el mínimo. La racha sigue."]],
   extras:["Extras", ["Hasta 2 tareas más, opcionales.", "Hazlas solo después de la principal."]],
   habitos:["Hábitos", ["La tarea dice <b>qué</b> hiciste; el hábito dice si fuiste <b>constante</b>.", "Si tiene tiempo, toca <b>▶</b>: al terminar el tiempo se marca solo. Si paras antes y pasaste el mínimo, cuenta como mínimo.", "¿Lo hiciste sin temporizador? Marca la casilla. En un día malo, toca <b>Solo mínimo</b>: la racha sigue.", "Un hábito ligado a un proyecto se marca solo cuando terminas una tarea de ese proyecto.", "Si te saltas un día programado, la app te avisa: nunca falles dos seguidos.", "Solo aparecen los días que tú eliges."]],
   dots:["Semana", ["Un punto por día.", "<b>Verde</b>: terminaste la principal. Día ganado.", "<b>Borde verde</b>: no terminaste la principal, pero cumpliste el mínimo de un hábito. La racha sigue.", "<b>Borde rojo</b>: ese día no hiciste ni la principal ni el mínimo."]],
@@ -1304,7 +1318,7 @@ function guideSheet(){
     <h3>Empezar</h3>
     <p>En Frentes toca <b>Crear frente</b> y elige el tipo. Un proyecto te guía por tareas → objetivo → hábito. Un hábito solo pide el tiempo al día y, si quieres, una meta con fecha.</p>
     <h3>Cada día</h3>
-    <ol><li><b>Durante el día:</b> lo que se te ocurra va a la Bandeja.</li><li><b>Cada noche, 5 min:</b> en Hoy → <b>Planear mañana</b>. Vacías la Bandeja y eliges la principal de mañana y hasta 2 extras.</li><li><b>Al día siguiente:</b> toca ▶ en la principal, trabaja y marca la casilla. En los hábitos con tiempo, toca ▶ y se marcan solos al terminar.</li><li><b>Día malo:</b> si no terminas la principal, haz el mínimo y toca <b>Solo mínimo</b> en el hábito.</li></ol>
+    <ol><li><b>Durante el día:</b> lo que se te ocurra va a la Bandeja.</li><li><b>Cada noche, 5 min:</b> en Hoy → <b>Planear mañana</b>. Vacías la Bandeja y eliges la principal de mañana y hasta 2 extras.</li><li><b>Al día siguiente:</b> a la hora de <b>tu bloque</b> toca ▶ en la principal, trabaja y marca la casilla. En los hábitos con tiempo, toca ▶ y se marcan solos al terminar.</li><li><b>Si sales tarde:</b> pasada tu hora de Plan B, Hoy te avisa: solo el mínimo.</li><li><b>Día malo:</b> si no terminas la principal, haz el mínimo y toca <b>Solo mínimo</b> en el hábito.</li></ol>
     <h3>Tu bosque</h3>
     <p>Cada objetivo con fechas tiene una isla con un espacio por día. Cada día que avanzas en ese frente crece un árbol: con fruto si era la Principal, un brote si solo hiciste el mínimo. Si fallas un día que tocaba, el árbol se marchita; cumple al día siguiente y lo salvas. Si fallas dos seguidos, cae seco.</p>
     <h3>Cada domingo, 30 min</h3>
@@ -1714,8 +1728,8 @@ document.addEventListener("keydown", e => { if (e.key === "Escape" && modal.rend
 document.addEventListener("visibilitychange", () => { if (!document.hidden && F.running) tick(); });
 
 /* ================= arranque ================= */
-let lastDay = today();
-setInterval(() => { if (today() !== lastDay){ lastDay = today(); sched(); } }, 60000);
+let lastDay = today(), lastLine = "";
+setInterval(() => { const k = mode === "connecting" ? "" : dayLine().k; if (today() !== lastDay || k !== lastLine){ lastDay = today(); lastLine = k; sched(); } }, 60000); // cambio de día y paso al Plan B
 async function init(){
   render();
   try { if (window.claude && window.claude.use) window.claude.use("downloads").then(x => { dl = x || null; }, () => {}); } catch(e){}
