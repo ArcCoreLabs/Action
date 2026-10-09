@@ -9,6 +9,8 @@
                  delete(){ delete store[p]; setTimeout(notify); return Promise.resolve(); },
                  onSnapshot(next){ const f = () => next(mk(p)); subs.push(f); setTimeout(f, 10); return () => {}; } })
   };
-  window.claude = { use: async n => n === 'db' ? db : null };
+  // downloads simulado: guarda en window.__saved lo que la app ofrece descargar (window.__NODL = true lo apaga)
+  const dl = { save: async ({ filename, data }) => { window.__saved = { filename, data:String(data) }; return { status:'saved' }; } };
+  window.claude = { use: async n => n === 'db' ? db : n === 'downloads' && !window.__NODL ? dl : null };
   window.__store = store;
 })();

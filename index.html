@@ -976,6 +976,7 @@ const HELP = {
   semana:["Semana", ["Arriba ves tus números de la semana.", "El domingo, en 30 minutos, respondes la revisión y defines la meta de la próxima semana."]],
   revision:["Revisión", ["Responde con frases cortas.", "En <b>¿Qué voy a cambiar?</b> cambia el sistema, no a ti: un horario, un mínimo, una regla.", "Marca si cumpliste la semana de cada objetivo y escribe qué debe estar hecho la próxima.", "Después crea en Frentes las tareas de esa semana."]],
   anteriores:["Anteriores", ["Tus revisiones pasadas, para ver cómo vas."]],
+  datos:["Tus datos", ["Tus datos viven en tu cuenta de Claude, dentro de esta app.", "<b>Descargar mis datos</b> guarda un archivo con todo. Hazlo cada domingo, después de la revisión.", "<b>Restaurar desde archivo</b> deja la app exactamente como estaba en esa copia: reemplaza todo lo actual.", "Antes de restaurar, la app te deja descargar lo que tienes ahora."]],
   bosque:["Bosque", ["Cada día del objetivo es un espacio de tu isla.", "Avanza en este frente y crece un <b>árbol</b>. Si era la Principal, da <b>fruto</b>. Si solo hiciste el mínimo, un <b>brote</b>.", "Si fallas un día que tocaba, ese árbol se <b>marchita</b>. Cumple el siguiente y lo salvas.", "Si fallas dos seguidos, cae <b>seco</b>. Nunca falles dos veces.", "Los días que no tocan quedan en pasto, sin castigo. Mientras el frente está congelado, tampoco cuenta."]]
 };
 function helpSheet(k){
@@ -1184,8 +1185,94 @@ function settingsSheet(){
       <label class="field" for="s-time">Hora fija del bloque entre semana<span class="hint">Pon una alarma diaria en tu iPhone a esta hora.</span><input type="time" id="s-time" value="${esc(st.fixedTime || "")}"></label>
       <label class="field" for="s-planb">Plan B: si salgo del trabajo después de…<span class="hint">Ese día solo haces el mínimo antes de dormir y la racha sigue viva.</span><input type="time" id="s-planb" value="${esc(st.planBTime || "")}"></label>
       <button class="btn primary block" type="submit">Guardar</button></form>
+      <div class="sec-head" style="margin:10px 0 0"><h3>Tus datos</h3>${info("datos")}</div>
+      ${dl ? `<button class="opt" data-act="backup"><span class="grow">Descargar mis datos<small>${st.lastBackup ? `Última copia: ${dayWord(st.lastBackup) === "hoy" ? "hoy" : fmtShort(st.lastBackup)}` : "Aún no has guardado ninguna copia."}</small></span></button>` : ""}
+      <label class="opt" for="restore-file" style="cursor:pointer"><span class="grow">Restaurar desde archivo<small>Reemplaza todo lo que tienes por lo de la copia.</small></span></label>
+      <input type="file" id="restore-file" accept=".json,application/json" hidden>
       <button class="text-btn muted" data-act="guide" style="justify-self:start">Ver guía completa</button>`);
   }, false);
+}
+/* ----- copia de seguridad: descargar todo en un archivo y restaurarlo (reemplaza todo) ----- */
+const COLS = ["fronts", "tasks", "goals", "habits", "reviews"];
+const ID_OK = /^(?!\.\.?$)[A-Za-z0-9_\-.~:@+]{1,200}$/;
+let dl = null; // downloads: null si este visor no puede guardar archivos (se oculta el botón)
+let RS = null; // copia leída, esperando las dos confirmaciones
+function backupData(){
+  const data = {}; COLS.forEach(c => { data[c] = clean(S[c]); });
+  data.meta = { settings:clean(S.settings || {}), focus:clean(S.focus || {days:{}}) };
+  return { app:"ejecucion", version:1, exported:new Date().toISOString(), data };
+}
+const countLine = d => join([plural(d.fronts.length, "frente", "frentes"), plural(d.tasks.length, "tarea", "tareas"), plural(d.goals.length, "objetivo", "objetivos"), plural(d.habits.length, "hábito", "hábitos"), plural(d.reviews.length, "revisión", "revisiones")]);
+async function backupSave(){
+  if (!dl) return;
+  try {
+    await dl.save({ filename:`ejecucion-${today()}.json`, data:JSON.stringify(backupData(), null, 1) });
+    putMeta("settings", {...settings(), lastBackup:today()}); toast("Copia guardada.");
+  } catch(e){
+    const c = e && e.code; if (c === "declined") return;
+    toast(c === "rate_limited" ? "Espera un momento y vuelve a intentarlo." : "No se pudo descargar la copia.");
+  }
+}
+function backupParse(text){ // los datos de la copia, o null si el archivo no sirve
+  let j; try { j = JSON.parse(text); } catch(e){ return null; }
+  if (!j || j.app !== "ejecucion" || !j.data || typeof j.data !== "object") return null;
+  const isObj = o => !!o && typeof o === "object" && !Array.isArray(o), d = {};
+  for (const c of COLS){
+    const a = j.data[c] || [];
+    if (!Array.isArray(a) || !a.every(x => isObj(x) && typeof x.id === "string" && ID_OK.test(x.id)) || new Set(a.map(x => x.id)).size !== a.length) return null;
+    d[c] = a;
+  }
+  const m = isObj(j.data.meta) ? j.data.meta : {};
+  if ((m.settings !== undefined && !isObj(m.settings)) || (m.focus !== undefined && !isObj(m.focus))) return null;
+  d.meta = { settings:m.settings || {}, focus:m.focus && isObj(m.focus.days) ? m.focus : {days:{}} };
+  return { exported:/^\d{4}-\d{2}-\d{2}/.test(String(j.exported || "")) ? String(j.exported).slice(0, 10) : null, data:d };
+}
+function restorePick(input){
+  const f = input.files && input.files[0]; if (!f) return;
+  f.text().then(t => {
+    input.value = ""; const b = backupParse(t);
+    if (!b){ toast("Ese archivo no es una copia de Ejecución."); return; }
+    RS = b; confirmKey = null; restoreSheet();
+  }).catch(() => toast("No se pudo leer el archivo."));
+}
+function restoreSheet(){
+  openModal(() => {
+    if (!RS) return "";
+    const d = RS.data, sure = confirmKey === "restore";
+    return sheet("Restaurar", `<p style="font-weight:700">Copia${RS.exported ? ` del ${fmtShort(RS.exported)}` : ""}</p>
+      <p class="muted">${countLine(d)}</p>
+      <p>Reemplaza todo lo que tienes ahora (${countLine(S)}). No se puede deshacer.</p>
+      ${dl ? `<button class="opt" data-act="backup"><span class="grow">Antes, descargar mis datos actuales<small>Por si quieres volver a como está hoy.</small></span></button>` : ""}
+      <button class="btn ${sure ? "go" : "primary"} block" data-act="restore-do">${sure ? "Toca otra vez: se reemplaza todo" : "Reemplazar mis datos"}</button>`);
+  });
+}
+async function restoreRun(d){ // una escritura a la vez, en orden; si se corta, se puede repetir con el mismo archivo
+  const ops = [];
+  COLS.forEach(c => {
+    const keep = new Set(d[c].map(x => x.id));
+    S[c].filter(x => !keep.has(x.id)).forEach(x => ops.push({ path:c + "/" + x.id }));
+    d[c].forEach(({id, ...body}) => ops.push({ path:c + "/" + id, data:body }));
+  });
+  ops.push({ path:"meta/settings", data:d.meta.settings }, { path:"meta/focus", data:d.meta.focus });
+  if (mode !== "db"){
+    COLS.forEach(c => { S[c] = clean(d[c]); }); S.settings = clean(d.meta.settings); S.focus = clean(d.meta.focus);
+    RS = null; closeModal(); sched(); toast("Datos restaurados."); return;
+  }
+  openModal(() => sheet("Restaurando", `<p>Restaurando <b id="rs-n">0</b> de ${ops.length}…</p><p class="muted">No cierres la app.</p>`), false);
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  let i = 0;
+  for (const op of ops){
+    for (let k = 0; ; k++){
+      try { await (op.data ? db.doc(op.path).set(clean(op.data)) : db.doc(op.path).delete()); break; }
+      catch(e){
+        const c = e && e.code;
+        if ((c === "unavailable" || c === "resource_exhausted") && k < 4){ await wait(400 * 2 ** k + Math.random() * 300); continue; }
+        closeModal(); toast(`La restauración quedó a medias (${i} de ${ops.length}). Vuelve a restaurar el mismo archivo.`); return;
+      }
+    }
+    i++; const n = document.getElementById("rs-n"); if (n) n.textContent = i;
+  }
+  RS = null; closeModal(); toast("Datos restaurados.");
 }
 
 /* ----- guía ----- */
@@ -1200,7 +1287,7 @@ function guideSheet(){
     <h3>Tu bosque</h3>
     <p>Cada objetivo con fechas tiene una isla con un espacio por día. Cada día que avanzas en ese frente crece un árbol: con fruto si era la Principal, un brote si solo hiciste el mínimo. Si fallas un día que tocaba, el árbol se marchita; cumple al día siguiente y lo salvas. Si fallas dos seguidos, cae seco.</p>
     <h3>Cada domingo, 30 min</h3>
-    <ol><li>En Semana responde las 3 preguntas.</li><li>Marca si cumpliste la semana de cada objetivo y escribe qué debe estar hecho la próxima.</li><li>En Frentes escribe las tareas de esa semana.</li></ol>
+    <ol><li>En Semana responde las 3 preguntas.</li><li>Marca si cumpliste la semana de cada objetivo y escribe qué debe estar hecho la próxima.</li><li>En Frentes escribe las tareas de esa semana.</li><li>En Ajustes, descarga tus datos: es tu copia de seguridad.</li></ol>
     <h3>Reglas</h3>
     <ul><li>Una sola principal por día. Si la cumples, el día está ganado.</li><li>Nunca falles dos veces seguidas: después de un fallo, el mínimo es obligatorio.</li><li>Decide la noche anterior. De día solo ejecutas.</li><li>Si una tarea te da pereza, está mal definida: pártela.</li></ul>
     <h3>Cómo escribir una tarea</h3>
@@ -1504,6 +1591,8 @@ const A = {
   "goal-dup"(d){ goalForm(null, d.id); },
   "goal-del"(d){ if (confirmTap("gdel-" + d.id)){ remove("goals", d.id); closeModal(); } },
   "goal-week"(d){ const g = S.goals.find(x => x.id === d.id); if (!g) return; const w = Array.from({length:Math.max(goalWeeks(g), (g.weekly || []).length)}, (_, i) => ({text:"", done:false, ...((g.weekly || [])[i] || {})})); w[+d.i].done = !w[+d.i].done; put("goals", {...g, weekly:w}); },
+  backup(){ backupSave(); },
+  "restore-do"(){ if (!RS || !confirmTap("restore")) return; restoreRun(RS.data); },
   "review-close"(){ saveReview(true); toast("Revisión guardada. Ahora escribe en Frentes las tareas de la semana."); }
 };
 
@@ -1573,6 +1662,7 @@ document.addEventListener("input", e => {
 });
 document.addEventListener("change", e => {
   if (e.target.matches("[data-review-check]")) saveReview(false);
+  if (e.target.id === "restore-file") restorePick(e.target);
   if (e.target.matches("[data-htime]")){ const box = e.target.closest(".hf"); if (box) box.dataset.timed = e.target.value ? "1" : "0"; }
   if (e.target.matches("#g-start,#g-deadline")){
     const st = $("#g-start").value, dl = $("#g-deadline").value, box = $("#g-weeks"); if (!box || !st || !dl) return;
@@ -1598,6 +1688,7 @@ let lastDay = today();
 setInterval(() => { if (today() !== lastDay){ lastDay = today(); sched(); } }, 60000);
 async function init(){
   render();
+  try { if (window.claude && window.claude.use) window.claude.use("downloads").then(x => { dl = x || null; }, () => {}); } catch(e){}
   let d = null;
   try { d = window.claude && window.claude.use ? await window.claude.use("db") : null; } catch(e){ d = null; }
   if (!d){ mode = "local"; render(); return; }

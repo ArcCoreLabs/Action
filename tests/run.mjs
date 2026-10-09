@@ -320,6 +320,54 @@ for (const scheme of ['light', 'dark']){
   ok((await store(p)).fronts.find(f => f.id === 'h1').status === 'active', 'un hábito congelado se activa aunque haya 2 proyectos');
   await p.close();
 }
+// ---------- 6. copia de seguridad ----------
+console.log('\nCopia de seguridad');
+{
+  const seed = { ...base2(), ...readHabit(), 'tasks/t1':{ title:'Repasar detecciones', frontId:'p1', minutes:45, slot:'critical', date:TODAY, done:true, doneAt:TODAY, created:1 },
+    'tasks/t2':{ title:'Llamar al banco', frontId:null, minutes:null, slot:null, date:null, done:false, created:2 },
+    'goals/g1':{ frontId:'p1', title:'Aprobar la CCFA', start:add(TODAY, -7), deadline:add(TODAY, 20), weekly:[{ text:'Módulo 1', done:true }], premortem:[], created:1 },
+    'reviews/2026-09-28':{ done:'Módulo 1', blocked:'', change:'App: botones más grandes', closed:true },
+    'meta/settings':{ vision:'Ciberseguridad', fixedTime:'19:30' }, 'meta/focus':{ days:{ [TODAY]:45 } } };
+  const dump = p => p.evaluate(() => JSON.stringify(Object.keys(window.__store).sort().map(k => [k, window.__store[k]])));
+  // descargar
+  let p = await open('light', seed); const before = await dump(p);
+  await p.click('[data-act=settings]');
+  ok(await p.locator('[data-act=backup]').count() === 1 && /Aún no has guardado/.test(await p.locator('[data-act=backup]').textContent()), 'Ajustes ofrece "Descargar mis datos"');
+  await p.screenshot({ path:path.join(out, 'ajustes-datos-light.png') });
+  await p.click('[data-act=backup]'); await p.waitForTimeout(80);
+  const saved = await p.evaluate(() => window.__saved);
+  ok(saved && saved.filename === `ejecucion-${TODAY}.json`, `descarga ejecucion-${TODAY}.json`);
+  const file = JSON.parse(saved.data);
+  ok(file.app === 'ejecucion' && file.data.fronts.length === 3 && file.data.tasks.length === 2 && file.data.habits.length === 1 && file.data.goals.length === 1 && file.data.reviews.length === 1 && file.data.meta.settings.vision === 'Ciberseguridad', 'el archivo trae todas las colecciones');
+  ok((await store(p)) && (await p.evaluate(() => window.__store['meta/settings'].lastBackup)) === TODAY, 'recuerda la fecha de la última copia');
+  // el "!" de Tus datos
+  await p.click('[data-act=help][data-k=datos]'); ok(/Restaurar desde archivo/.test(await p.locator('.sheet').textContent()), 'el "!" de Tus datos explica descargar y restaurar');
+  ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
+  // restaurar en un almacenamiento vacío reproduce el mismo estado
+  p = await open('light', { 'tasks/zz':{ title:'Tarea que sobra', frontId:null, minutes:null, slot:null, date:null, done:false, created:9 } });
+  await p.click('[data-act=settings]');
+  await p.setInputFiles('#restore-file', { name:`ejecucion-${TODAY}.json`, mimeType:'application/json', buffer:Buffer.from(saved.data) });
+  await p.waitForSelector('[data-act=restore-do]');
+  const sum = await p.locator('.sheet').textContent();
+  ok(/3 frentes·2 tareas·1 objetivo·1 hábito·1 revisión/.test(sum) && /Reemplaza todo lo que tienes ahora \(0 frentes·1 tarea/.test(sum), 'muestra el resumen de la copia y de lo actual');
+  await p.screenshot({ path:path.join(out, 'restaurar-light.png') });
+  await p.click('[data-act=restore-do]'); await p.waitForTimeout(60);
+  ok(/Toca otra vez/.test(await p.locator('[data-act=restore-do]').textContent()) && !(await p.evaluate(() => window.__store['fronts/p1'])), 'el primer toque solo pide confirmar');
+  await p.click('[data-act=restore-do]'); await p.waitForTimeout(400);
+  const after = await p.evaluate(() => JSON.stringify(Object.keys(window.__store).sort().map(k => [k, window.__store[k]])));
+  ok(after === before, 'restaurar reproduce exactamente el mismo estado (y borra lo que sobraba)');
+  await nav(p, 'frentes'); ok(await p.locator('.front').count() >= 3, 'la app se ve con los datos restaurados');
+  ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
+  // archivo que no es una copia
+  p = await open('light', seed); await p.click('[data-act=settings]');
+  await p.setInputFiles('#restore-file', { name:'otro.json', mimeType:'application/json', buffer:Buffer.from('{"hola":1}') }); await p.waitForTimeout(120);
+  ok(/no es una copia de Ejecución/.test(await toastText(p)) && await p.locator('[data-act=restore-do]').count() === 0, 'rechaza un archivo que no es una copia');
+  ok((await dump(p)) === before, 'un archivo inválido no cambia nada'); await p.close();
+  // sin la capacidad de descargar, el botón no aparece (restaurar sí)
+  p = await b.newPage({ viewport:{ width:390, height:860 } }); await p.clock.setFixedTime(new Date(NOW)); await p.addInitScript(() => { window.__NODL = true; });
+  await p.goto('file://' + page); await p.waitForSelector('.sec-head'); await p.click('[data-act=settings]');
+  ok(await p.locator('[data-act=backup]').count() === 0 && await p.locator('label[for=restore-file]').count() === 1, 'sin descargas se oculta el botón y queda restaurar'); await p.close();
+}
 // escritorio
 { const p = await open('light', seedGoal({ start:add(TODAY, -16), days:28, levels:pattern(add(TODAY, -16), add(TODAY, -1)) }), 1280);
   await nav(p, 'metas'); await p.screenshot({ path:path.join(out, 'metas-escritorio.png') }); ok(!p.errs.length, 'escritorio sin errores'); await p.close(); }
