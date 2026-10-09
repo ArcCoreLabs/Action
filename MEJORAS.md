@@ -175,7 +175,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 
 **Listo cuando:** en ningún flujo se piden dos veces el mínimo y el estándar del mismo frente, los datos antiguos siguen mostrándose bien y `node tests/run.mjs` sigue pasando los casos del bosque.
 
-### Tarea 2: Tu bloque y el Plan B visibles en Hoy *(alta)*
+### Tarea 2: Tu bloque y el Plan B visibles en Hoy *(fase 1 · hecha, falta publicar)*
 
 **Problema:** `fixedTime` y `planBTime` solo aparecen en el último paso de "Planear mañana".
 
@@ -186,6 +186,8 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 - Recalcular cada minuto (ya existe un `setInterval` de 60 s para el cambio de día).
 
 **Listo cuando:** con la hora simulada (por ejemplo con `page.clock` de Playwright), la línea cambia al pasar `planBTime`.
+
+**Hecho:** `dayLine()` devuelve la línea de debajo de la fecha, solo de lunes a viernes: "Tu bloque: 7:30 p. m."; "Plan B activo: hoy solo el mínimo" (punto `--warn`) si pasó `planBTime` y la Principal no está hecha (aunque no haya hora fija); o "+ Elegir tu hora fija", que abre Ajustes. El `setInterval` de 60 s redibuja cuando cambia el día o el estado de la línea. Cubierto por `tests/run.mjs` ("Tu bloque y el Plan B", con `page.clock.install` + `runFor`).
 
 ### Tarea 3: Copia de seguridad *(fase 1 · hecha)*
 
