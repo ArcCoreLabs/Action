@@ -11,7 +11,7 @@ Cada fase termina con la app publicada y usable. No se empieza una fase sin cerr
 | Fase | Qué | Tareas | Se cierra cuando |
 |---|---|---|---|
 | **0 · Base** ✓ | Repo con historial, pruebas automáticas, el bosque y el estilo compacto | Tarea 0 | Cerrada: publicado en el artifact (versión 11) |
-| **1 · Lo crítico** | Lo que protege tus datos y quita fricción diaria | Tarea 7 → Tarea 3 → Tarea 1 → Tarea 2 | Tienes una copia descargada y la app no pide nada dos veces |
+| **1 · Lo crítico** ✓ | Lo que protege tus datos y quita fricción diaria | Tarea 7 → Tarea 3 → Tarea 1 → Tarea 2 | Cerrada: publicado en el artifact (versión 13). Solo falta que descargues tu primera copia |
 | **2 · Usarla** | 4 semanas de uso real, **sin funciones nuevas** (solo arreglar errores) | — | Pasaron 4 domingos con revisión cerrada |
 | **3 · Según el uso** | Solo lo que el uso real pida, en este orden por defecto | Tarea 5 → Tarea 6 → Tarea 4 | Tú decides, con lo anotado en la fase 2 |
 | **4 · Fuera del artifact** | La versión independiente (sección 3) | — | Fuera de alcance por ahora |
@@ -159,7 +159,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 
 **Listo cuando:** se puede crear "Leer Dune · 20 min" con 2 proyectos activos, cumplirlo desde Hoy solo con ▶ y ver crecer su bosque, sin escribir tareas ni números. Cubierto por `node tests/run.mjs` (sección "Frentes de hábito").
 
-### Tarea 1: Un solo mínimo y un solo estándar *(fase 1 · hecha, falta publicar)*
+### Tarea 1: Un solo mínimo y un solo estándar *(fase 1 · hecha)*
 
 **Problema:** el objetivo y el hábito tienen cada uno su propio "Mínimo" y "Estándar". El usuario puede terminar escribiendo dos mínimos distintos para el mismo frente.
 
@@ -175,7 +175,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 
 **Listo cuando:** en ningún flujo se piden dos veces el mínimo y el estándar del mismo frente, los datos antiguos siguen mostrándose bien y `node tests/run.mjs` sigue pasando los casos del bosque.
 
-### Tarea 2: Tu bloque y el Plan B visibles en Hoy *(fase 1 · hecha, falta publicar)*
+### Tarea 2: Tu bloque y el Plan B visibles en Hoy *(fase 1 · hecha)*
 
 **Problema:** `fixedTime` y `planBTime` solo aparecen en el último paso de "Planear mañana".
 
