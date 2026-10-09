@@ -990,7 +990,7 @@ const autoGrow = el => { const y = window.scrollY; el.style.height = "auto"; el.
 const growAll = () => requestAnimationFrame(() => document.querySelectorAll("textarea.auto").forEach(autoGrow));
 function openModal(fn, live = true){ modal.render = fn; modal.live = live; modal.guard = !live; $("#modal").innerHTML = fn(); growAll(); const f = $("#modal [autofocus]"); if (f) f.focus(); }
 function closeModal(){ modal.render = null; modal.live = false; $("#modal").innerHTML = ""; }
-const sheet = (title, body) => `<div class="scrim" data-act="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="sheet-head"><h2>${title}</h2><button class="icon-btn" data-act="close" aria-label="Cerrar">${ICON.close}</button></div>${body}</div></div>`;
+const sheet = (title, body, x = true) => `<div class="scrim" data-act="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="sheet-head"><h2>${title}</h2>${x ? `<button class="icon-btn" data-act="close" aria-label="Cerrar">${ICON.close}</button>` : ""}</div>${body}</div></div>`;
 
 let confirmKey = null;
 function taskSheet(id){
@@ -1196,7 +1196,8 @@ function settingsSheet(){
 const COLS = ["fronts", "tasks", "goals", "habits", "reviews"];
 const ID_OK = /^(?!\.\.?$)[A-Za-z0-9_\-.~:@+]{1,200}$/;
 let dl = null; // downloads: null si este visor no puede guardar archivos (se oculta el botón)
-let RS = null; // copia leída, esperando las dos confirmaciones
+let RS = null, restoring = false; // copia leída, esperando las dos confirmaciones; restoring: hay una restauración en curso
+const loaded = () => mode === "local" || (mode === "db" && ready.size === SOURCES.length); // copiar o restaurar antes de cargar daría una copia vacía
 function backupData(){
   const data = {}; COLS.forEach(c => { data[c] = clean(S[c]); });
   data.meta = { settings:clean(S.settings || {}), focus:clean(S.focus || {days:{}}) };
@@ -1205,12 +1206,19 @@ function backupData(){
 const countLine = d => join([plural(d.fronts.length, "frente", "frentes"), plural(d.tasks.length, "tarea", "tareas"), plural(d.goals.length, "objetivo", "objetivos"), plural(d.habits.length, "hábito", "hábitos"), plural(d.reviews.length, "revisión", "revisiones")]);
 async function backupSave(){
   if (!dl) return;
+  if (!loaded()){ toast("Espera a que carguen tus datos."); return; }
   try {
     await dl.save({ filename:`ejecucion-${today()}.json`, data:JSON.stringify(backupData(), null, 1) });
     putMeta("settings", {...settings(), lastBackup:today()}); toast("Copia guardada.");
+    document.querySelectorAll("#modal [data-act=backup] small").forEach(x => { x.textContent = "Última copia: hoy"; });
   } catch(e){
     const c = e && e.code; if (c === "declined") return;
-    toast(c === "rate_limited" ? "Espera un momento y vuelve a intentarlo." : "No se pudo descargar la copia.");
+    if (c === "rate_limited"){ toast("Espera un momento y vuelve a intentarlo."); return; }
+    if (!["too_large", "bad_request", "transform_error", "rejected_extension", "extension_not_enabled", "request_unknown"].includes(c)){ // aquí no se pueden guardar archivos: se quita el botón
+      dl = null; document.querySelectorAll("#modal [data-act=backup]").forEach(x => x.remove());
+      toast("Aquí no se pueden descargar archivos. Ábrela en claude.ai."); return;
+    }
+    toast("No se pudo descargar la copia.");
   }
 }
 function backupParse(text){ // los datos de la copia, o null si el archivo no sirve
@@ -1225,10 +1233,12 @@ function backupParse(text){ // los datos de la copia, o null si el archivo no si
   const m = isObj(j.data.meta) ? j.data.meta : {};
   if ((m.settings !== undefined && !isObj(m.settings)) || (m.focus !== undefined && !isObj(m.focus))) return null;
   d.meta = { settings:m.settings || {}, focus:m.focus && isObj(m.focus.days) ? m.focus : {days:{}} };
-  return { exported:/^\d{4}-\d{2}-\d{2}/.test(String(j.exported || "")) ? String(j.exported).slice(0, 10) : null, data:d };
+  const t = Date.parse(j.exported);
+  return { exported:isNaN(t) ? null : ymd(new Date(t)), data:d };
 }
 function restorePick(input){
   const f = input.files && input.files[0]; if (!f) return;
+  if (!loaded() || restoring){ input.value = ""; toast("Espera a que carguen tus datos."); return; }
   f.text().then(t => {
     input.value = ""; const b = backupParse(t);
     if (!b){ toast("Ese archivo no es una copia de Ejecución."); return; }
@@ -1241,12 +1251,15 @@ function restoreSheet(){
     const d = RS.data, sure = confirmKey === "restore";
     return sheet("Restaurar", `<p style="font-weight:700">Copia${RS.exported ? ` del ${fmtShort(RS.exported)}` : ""}</p>
       <p class="muted">${countLine(d)}</p>
+      ${RS.failed ? `<p class="notice warn"><span>La restauración quedó a medias (${RS.failed}). Toca <b>Reemplazar mis datos</b> para terminarla.</span></p>` : ""}
       <p>Reemplaza todo lo que tienes ahora (${countLine(S)}). No se puede deshacer.</p>
       ${dl ? `<button class="opt" data-act="backup"><span class="grow">Antes, descargar mis datos actuales<small>Por si quieres volver a como está hoy.</small></span></button>` : ""}
-      <button class="btn ${sure ? "go" : "primary"} block" data-act="restore-do">${sure ? "Toca otra vez: se reemplaza todo" : "Reemplazar mis datos"}</button>`);
+      <button class="btn ${sure ? "danger" : "primary"} block" data-act="restore-do">${sure ? "Toca otra vez: se reemplaza todo" : "Reemplazar mis datos"}</button>`);
   });
 }
 async function restoreRun(d){ // una escritura a la vez, en orden; si se corta, se puede repetir con el mismo archivo
+  const lb = [settings().lastBackup, d.meta.settings.lastBackup].filter(Boolean).sort().pop();
+  if (lb) d.meta.settings = {...d.meta.settings, lastBackup:lb}; // no olvidar la copia que acabas de descargar
   const ops = [];
   COLS.forEach(c => {
     const keep = new Set(d[c].map(x => x.id));
@@ -1258,7 +1271,8 @@ async function restoreRun(d){ // una escritura a la vez, en orden; si se corta, 
     COLS.forEach(c => { S[c] = clean(d[c]); }); S.settings = clean(d.meta.settings); S.focus = clean(d.meta.focus);
     RS = null; closeModal(); sched(); toast("Datos restaurados."); return;
   }
-  openModal(() => sheet("Restaurando", `<p>Restaurando <b id="rs-n">0</b> de ${ops.length}…</p><p class="muted">No cierres la app.</p>`), false);
+  restoring = true;
+  openModal(() => sheet("Restaurando", `<p>Restaurando <b id="rs-n">0</b> de ${ops.length}…</p><p class="muted">No cierres la app.</p>`, false), false);
   const wait = ms => new Promise(r => setTimeout(r, ms));
   let i = 0;
   for (const op of ops){
@@ -1267,12 +1281,12 @@ async function restoreRun(d){ // una escritura a la vez, en orden; si se corta, 
       catch(e){
         const c = e && e.code;
         if ((c === "unavailable" || c === "resource_exhausted") && k < 4){ await wait(400 * 2 ** k + Math.random() * 300); continue; }
-        closeModal(); toast(`La restauración quedó a medias (${i} de ${ops.length}). Vuelve a restaurar el mismo archivo.`); return;
+        restoring = false; RS.failed = `${i} de ${ops.length}`; confirmKey = null; restoreSheet(); return;
       }
     }
     i++; const n = document.getElementById("rs-n"); if (n) n.textContent = i;
   }
-  RS = null; closeModal(); toast("Datos restaurados.");
+  restoring = false; RS = null; closeModal(); toast("Datos restaurados.");
 }
 
 /* ----- guía ----- */
@@ -1522,7 +1536,7 @@ const A = {
   close(){ closeModal(); },
   scrim(d, el, e){ if (e.target === el && !modal.guard) closeModal(); },
   guide(){ guideSheet(); },
-  settings(){ settingsSheet(); },
+  settings(){ if (!loaded()){ toast("Espera a que carguen tus datos."); return; } settingsSheet(); },
   done(d){ toggleDone(d.id); if (modal.render && !$("#modal .steps")) closeModal(); },
   focus(d){ closeModal(); focusOpen(d.id); },
   hfocus(d){ closeModal(); focusHabit(d.id); },
@@ -1592,7 +1606,8 @@ const A = {
   "goal-del"(d){ if (confirmTap("gdel-" + d.id)){ remove("goals", d.id); closeModal(); } },
   "goal-week"(d){ const g = S.goals.find(x => x.id === d.id); if (!g) return; const w = Array.from({length:Math.max(goalWeeks(g), (g.weekly || []).length)}, (_, i) => ({text:"", done:false, ...((g.weekly || [])[i] || {})})); w[+d.i].done = !w[+d.i].done; put("goals", {...g, weekly:w}); },
   backup(){ backupSave(); },
-  "restore-do"(){ if (!RS || !confirmTap("restore")) return; restoreRun(RS.data); },
+  "restore-do"(d, el, e){ if (!RS || restoring) return; if (confirmKey === "restore" && e.timeStamp - RS.armed < 400) return;
+    if (!confirmTap("restore")){ RS.armed = e.timeStamp; return; } restoreRun(RS.data); },
   "review-close"(){ saveReview(true); toast("Revisión guardada. Ahora escribe en Frentes las tareas de la semana."); }
 };
 

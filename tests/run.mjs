@@ -353,10 +353,22 @@ console.log('\nCopia de seguridad');
   await p.screenshot({ path:path.join(out, 'restaurar-light.png') });
   await p.click('[data-act=restore-do]'); await p.waitForTimeout(60);
   ok(/Toca otra vez/.test(await p.locator('[data-act=restore-do]').textContent()) && !(await p.evaluate(() => window.__store['fronts/p1'])), 'el primer toque solo pide confirmar');
-  await p.click('[data-act=restore-do]'); await p.waitForTimeout(400);
+  await p.click('[data-act=restore-do]'); await p.waitForTimeout(100);
+  ok(!(await p.evaluate(() => window.__store['fronts/p1'])), 'dos toques rápidos no restauran (el segundo debe ser deliberado)');
+  await p.waitForTimeout(400); await p.click('[data-act=restore-do]'); await p.waitForTimeout(400);
   const after = await p.evaluate(() => JSON.stringify(Object.keys(window.__store).sort().map(k => [k, window.__store[k]])));
   ok(after === before, 'restaurar reproduce exactamente el mismo estado (y borra lo que sobraba)');
   await nav(p, 'frentes'); ok(await p.locator('.front').count() >= 3, 'la app se ve con los datos restaurados');
+  ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
+  // si falla a la mitad, queda un aviso fijo y se termina con el mismo archivo
+  p = await open('light', {}); await p.evaluate(() => { window.__FAILAT = 4; });
+  await p.click('[data-act=settings]');
+  await p.setInputFiles('#restore-file', { name:'copia.json', mimeType:'application/json', buffer:Buffer.from(saved.data) }); await p.waitForSelector('[data-act=restore-do]');
+  await p.click('[data-act=restore-do]'); await p.waitForTimeout(450); await p.click('[data-act=restore-do]'); await p.waitForTimeout(400);
+  ok(/quedó a medias \(3 de \d+\)/.test(await p.locator('.sheet').textContent()), 'si falla a la mitad lo dice fijo en la hoja');
+  await p.evaluate(() => { window.__FAILAT = undefined; });
+  await p.click('[data-act=restore-do]'); await p.waitForTimeout(450); await p.click('[data-act=restore-do]'); await p.waitForTimeout(400);
+  ok((await dump(p)) === before, 'repetir con el mismo archivo termina la restauración');
   ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
   // archivo que no es una copia
   p = await open('light', seed); await p.click('[data-act=settings]');

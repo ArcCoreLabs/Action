@@ -32,7 +32,7 @@ Cada fase termina con la app publicada y usable. No se empieza una fase sin cerr
 
 - URL del artifact: `https://claude.ai/artifact/D1Vk3U5EHEfGAfyGAgCEW9`
 - Para publicar cambios hay que usar la **herramienta Artifact** con `url` igual a esa dirección. Primero lee el artifact con `action: "read"` y construye sobre esa versión.
-- **No cambies `capabilities`.** Si omites el campo al publicar, se mantiene la declaración actual: `db` con la regla `{path:"", read:"owner", write:"owner"}`, es decir, solo el dueño lee y escribe.
+- **Capabilities declaradas:** `db` con la regla `{path:"", read:"owner", write:"owner"}` (solo el dueño lee y escribe) y `downloads` (desde la Tarea 3). Si omites el campo al publicar, se mantiene la declaración. Si lo pasas, repítelas **todas**: `{db:{rules:[{path:"",read:"owner",write:"owner"}]}, downloads:true}` (más `sample:{}` desde la Tarea 4).
 - Interfaz en **español (Colombia)**, pensada sobre todo para iPhone (ancho de unos 390 px), con modo claro y oscuro.
 
 ### Filosofía del producto (no romperla)
@@ -74,7 +74,7 @@ habits/{id}   { name, minimum, standard, days: [0-6], frontId|null,
                 time?: { "YYYY-MM-DD": minutos },              // minutos hechos con ▶ ese día
                 daysHist?: [{to:"YYYY-MM-DD", days:[0-6]}] }  // días que tenía antes de cada cambio
 reviews/{lunes YYYY-MM-DD} { done, blocked, change, inbox, frozen, closed }
-meta/settings { vision, fixedTime, planBTime }
+meta/settings { vision, fixedTime, planBTime, lastBackup? }   // lastBackup: día de la última copia descargada
 meta/focus    { days: { "YYYY-MM-DD": minutos } }
 ```
 
@@ -186,7 +186,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 
 **Listo cuando:** con la hora simulada (por ejemplo con `page.clock` de Playwright), la línea cambia al pasar `planBTime`.
 
-### Tarea 3: Copia de seguridad *(alta)*
+### Tarea 3: Copia de seguridad *(fase 1 · hecha, falta publicar)*
 
 **Hacer:**
 - Agregar la capability `downloads` (publicar con `capabilities: {db:{rules:[{path:"",read:"owner",write:"owner"}]}, downloads:true}`, repitiendo la regla de `db` completa).
@@ -195,6 +195,14 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 - Si `claude.use("downloads")` devuelve `null`, ocultar el botón.
 
 **Listo cuando:** descargar y restaurar en un almacenamiento vacío reproduce el mismo estado.
+
+**Hecho:**
+- **Ajustes → Tus datos** (con su "!"): "Descargar mis datos" guarda `ejecucion-AAAA-MM-DD.json` (`{app:"ejecucion", version:1, exported, data:{fronts, tasks, goals, habits, reviews, meta:{settings, focus}}}`) y muestra "Última copia: …". Si `downloads` no está o responde que aquí no se puede, el botón no aparece.
+- **Restaurar desde archivo** **reemplaza todo** (decisión del usuario). Valida la copia (app, colecciones como arreglos, ids válidos y sin repetir) y muestra qué trae y qué hay ahora. Ofrece descargar lo actual antes y pide dos toques, con el segundo pausado.
+- Escribe un documento a la vez, con reintentos si el servidor pide esperar. Mientras tanto la hoja no se puede cerrar. Si falla a la mitad, queda un aviso fijo y se termina repitiendo el mismo archivo.
+- No se puede copiar ni restaurar hasta que la app terminó de cargar (si no, la copia saldría vacía). La fecha de la última copia se conserva al restaurar.
+- La guía pide descargar los datos cada domingo.
+- Mapa: `COLS`, `backupData`, `backupSave`, `backupParse`, `restorePick`, `restoreSheet`, `restoreRun`, `loaded`, `dl`, `RS`, `restoring`. Pruebas en `tests/run.mjs` (sección "Copia de seguridad"); `tests/mock.js` simula `downloads` (`window.__NODL` lo apaga) y fallos de escritura (`window.__FAILAT`).
 
 ### Tarea 4: IA dentro de la app *(media)*
 
@@ -268,7 +276,7 @@ Esto no se hace en el artifact. Queda como referencia para una versión independ
    - Que congelar un frente oculte su hábito en Hoy.
    - Que no haya errores en la consola (`pageerror`) ni scroll horizontal (`scrollWidth === 390`).
 4. **Una sola revisión visual** (capturas) antes de publicar.
-5. **Publicar** con la herramienta Artifact (`url` del artifact), sin pasar `capabilities` salvo en las tareas 3 y 4.
+5. **Publicar** con la herramienta Artifact (`url` del artifact). Sin `capabilities` se conservan las declaradas; si una tarea las cambia, pasarlas todas.
 
 ---
 
