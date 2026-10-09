@@ -623,6 +623,14 @@ function forestArt(x){
   if (x.state === "saved") return `<g transform="scale(.7)">${TREES[1].body}</g>`;
   return ART[x.state] || "";
 }
+const hashStr = s => { let h = 2166136261; for (const ch of String(s)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return h >>> 0; };
+function forestSpots(key, side){ // orden al azar de los espacios de la isla; siempre el mismo para el mismo objetivo
+  let seed = hashStr(key);
+  const rnd = () => { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  const a = Array.from({length:side * side}, (_, i) => i);
+  for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
 function forestSvg(g, days){
   const W = 20, H = 10, T = 5, B = 1.4, side = Math.max(3, Math.ceil(Math.sqrt(days.length))), t = today();
   const at = i => { const c = i % side, r = Math.floor(i / side); return {c, r, x:(c - r) * W / 2, y:(c + r) * H / 2}; };
@@ -632,7 +640,8 @@ function forestSvg(g, days){
     + `<path class="grs" d="M${L} ${M}L0 ${D}v${B}L${L} ${M + B}z"/><path class="grs" d="M0 ${D}L${R} ${M}v${B}L0 ${D + B}z" style="opacity:.8"/>`
     + `<path class="gr" d="M0 0L${R} ${M}L0 ${D}L${L} ${M}z"/>`;
   for (let i = 0; i < side * side; i++){ const p = at(i); if ((p.c + p.r) % 2) ground += dia(p.x, p.y, "gr2"); }
-  const items = days.map(x => ({x, p:at(x.i)})).sort((a, b) => (a.p.c + a.p.r) - (b.p.c + b.p.r) || a.p.c - b.p.c);
+  const spots = forestSpots(`${g.id}:${days.length ? days[0].d : ""}`, side); // cada día cae en un lugar al azar de todo el campo
+  const items = days.map(x => ({x, p:at(spots[x.i])})).sort((a, b) => (a.p.c + a.p.r) - (b.p.c + b.p.r) || a.p.c - b.p.c);
   const objs = items.map(({x, p}) => {
     const cx = p.x, cy = p.y + H / 2, art = forestArt(x);
     let grow = "";
@@ -834,7 +843,7 @@ VIEWS.frentes = function(){
       ${(() => { const g = goalFor(f.id), h = S.habits.find(x => x.frontId === f.id);
         const gHtml = g ? (() => { const wk = goalWeek(g), n = goalWeeks(g), cur = (g.weekly || [])[Math.max(0, wk-1)];
           const tr = wk && forestOn(g) ? forestStats(g, forestDays(g)).trees : 0;
-          return `<span class="tmeta">${wk ? `Objetivo · semana ${wk} de ${n}${tr ? ` · ${plural(tr, "árbol", "árboles")}` : ""}` : `Objetivo · empieza el ${fmtShort(g.start)}`}</span><b>${esc(g.title)}</b>${cur && cur.text ? `<span class="fg-week">${wk ? "Esta semana" : "Primera semana"}: ${esc(cur.text)}</span>` : ""}`; })() : "";
+          return `<span class="tmeta">${wk ? `Objetivo · ${hk && g.start && g.deadline ? `día ${Math.min(diffDays(g.start, today()) + 1, diffDays(g.start, g.deadline) + 1)} de ${diffDays(g.start, g.deadline) + 1}` : `semana ${wk} de ${n}`}${tr ? ` · ${plural(tr, "árbol", "árboles")}` : ""}` : `Objetivo · empieza el ${fmtShort(g.start)}`}</span><b>${esc(g.title)}</b>${cur && cur.text ? `<span class="fg-week">${wk ? "Esta semana" : "Primera semana"}: ${esc(cur.text)}</span>` : ""}`; })() : "";
         const hHtml = h ? `<span class="tmeta fg-habit">Hábito · ${esc(daysLabel(h.days))}${h.minutes ? ` · ${h.minutes} min · mínimo ${h.minMinutes || h.minutes} min` : `${h.minimum ? ` · mínimo ${esc(h.minimum)}` : ""}${h.standard ? ` · estándar ${esc(h.standard)}` : ""}`}</span>` : "";
         const add = [!g ? `<button class="text-btn muted" data-act="goal-new" data-front="${f.id}">+ Objetivo</button>` : "", !h ? `<button class="text-btn muted" data-act="habit-quick" data-front="${f.id}">+ Hábito</button>` : ""].join("");
         return (g || h ? `<div class="front-goal">${gHtml}${hHtml}</div>` : "") + (add ? `<div class="front-add">${add}</div>` : ""); })()}
@@ -874,7 +883,7 @@ VIEWS.metas = function(){
       <div class="front-head"><div class="tmain"><span class="tmeta">${esc(f ? f.name : "Sin frente")}</span><h2>${esc(g.title || "Objetivo sin nombre")}</h2></div>
         <button class="more" data-act="goal-sheet" data-id="${g.id}" aria-label="Opciones">${ICON.more}</button></div>
       <div><div class="bar"><span style="width:${fst ? hit / Math.max(1, fst.total) * 100 : doneN/N*100}%"></span><i style="left:${elapsed}%"></i></div>
-        <p class="bar-legend">${join([g.start && today() < g.start ? `Empieza el ${fmtShort(g.start)}` : g.deadline && today() > g.deadline ? (hk ? "Terminó" : doneN === N ? "Cumplido" : "Plazo vencido") : `Semana ${wk} de ${N}`, fst ? `${hit} de ${plural(fst.total, "día", "días")} cumplidos` : `${doneN}/${N} semanas cumplidas`, g.deadline && today() <= g.deadline ? `faltan ${diffDays(today(), g.deadline)} días` : ""])}</p></div>
+        <p class="bar-legend">${join([g.start && today() < g.start ? `Empieza el ${fmtShort(g.start)}` : g.deadline && today() > g.deadline ? (hk ? "Terminó" : doneN === N ? "Cumplido" : "Plazo vencido") : fst ? `Día ${diffDays(g.start, today()) + 1} de ${fst.total}` : `Semana ${wk} de ${N}`, fst ? plural(hit, "día cumplido", "días cumplidos") : `${doneN}/${N} semanas cumplidas`, g.deadline && today() <= g.deadline ? `faltan ${diffDays(today(), g.deadline)} días` : ""])}</p></div>
       ${forestOn(g) ? forestBlock(g) : ""}
       ${items.length && !hk ? `<div class="list">${items.map(w => `<div class="trow ${w.done ? "done" : ""} ${w.i + 1 === wk ? "cur" : ""}">
         <button class="check ${w.done ? "on" : ""}" data-act="goal-week" data-id="${g.id}" data-i="${w.i}" aria-label="Marcar semana ${w.i + 1}">${ICON.check}</button>
