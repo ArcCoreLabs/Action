@@ -10,7 +10,7 @@ Cada fase termina con la app publicada y usable. No se empieza una fase sin cerr
 
 | Fase | Qué | Tareas | Se cierra cuando |
 |---|---|---|---|
-| **0 · Base** | Repo con historial, pruebas automáticas y el bosque | Tarea 0 | El bosque está publicado en el artifact |
+| **0 · Base** ✓ | Repo con historial, pruebas automáticas, el bosque y el estilo compacto | Tarea 0 | Cerrada: publicado en el artifact (versión 11) |
 | **1 · Lo crítico** | Lo que protege tus datos y quita fricción diaria | Tarea 7 → Tarea 3 → Tarea 1 → Tarea 2 | Tienes una copia descargada y la app no pide nada dos veces |
 | **2 · Usarla** | 4 semanas de uso real, **sin funciones nuevas** (solo arreglar errores) | — | Pasaron 4 domingos con revisión cerrada |
 | **3 · Según el uso** | Solo lo que el uso real pida, en este orden por defecto | Tarea 5 → Tarea 6 → Tarea 4 | Tú decides, con lo anotado en la fase 2 |
@@ -110,7 +110,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 
 ## 2. Tareas
 
-### Tarea 0: Bosque del objetivo *(fase 0 · hecha, falta publicar)*
+### Tarea 0: Bosque del objetivo *(fase 0 · hecha)*
 
 **Idea:** como la app Forest (una isla de pasto en perspectiva), con los colores y la letra de Ejecución. Cada objetivo con inicio y fecha límite tiene su isla: empieza vacía y se llena con cada día que avanzas. Aplica la regla *nunca fallar dos veces seguidas*.
 
@@ -141,7 +141,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 - **Avisos al marcar:** primer avance del día: "Brotó una planta en tu bosque." (mínimo), "Creció un árbol en tu bosque." (tarea o hábito) o "Creció un árbol con fruto en tu bosque." (Principal). Si ya había brote: "El brote ya es un árbol.". Si ya había algo y terminas la Principal: "Tu árbol dio fruto.". Si había un árbol marchito por salvar, se agrega "Salvaste el que se marchitaba.". Lo que crece hoy se anima una vez al abrir Metas.
 - **Guía:** sección "Tu bosque".
 
-### Tarea 7: Frentes de hábito con tiempo *(fase 1 · hecha, falta publicar)*
+### Tarea 7: Frentes de hábito con tiempo *(fase 1 · hecha)*
 
 **Problema:** un hábito como "leer Dune" obligaba a crear la tarea "Leer" cada día para poder marcarlo. Registrar páginas también es fricción.
 
