@@ -159,7 +159,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 
 **Listo cuando:** se puede crear "Leer Dune · 20 min" con 2 proyectos activos, cumplirlo desde Hoy solo con ▶ y ver crecer su bosque, sin escribir tareas ni números. Cubierto por `node tests/run.mjs` (sección "Frentes de hábito").
 
-### Tarea 1: Un solo mínimo y un solo estándar *(alta)*
+### Tarea 1: Un solo mínimo y un solo estándar *(fase 1 · hecha, falta publicar)*
 
 **Problema:** el objetivo y el hábito tienen cada uno su propio "Mínimo" y "Estándar". El usuario puede terminar escribiendo dos mínimos distintos para el mismo frente.
 
@@ -170,7 +170,8 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 - En `VIEWS.metas` (Plan), mostrar los valores del hábito cuando exista.
 
 - **Bosque:** el brote sale solo del `log` "min" de un hábito. Si el frente no tiene hábito, el mínimo del objetivo no se puede marcar y el aviso de Hoy pide terminar la Principal.
-- **Ya resuelto por la Tarea 7:** en los frentes de hábito la meta no pide mínimo ni estándar, y en los hábitos con tiempo ambos salen de los minutos. Falta lo mismo para los proyectos.
+- **Ya resuelto por la Tarea 7:** en los frentes de hábito la meta no pide mínimo ni estándar, y en los hábitos con tiempo ambos salen de los minutos.
+- **Hecho para los proyectos:** `stdMinHtml(fid, g)` muestra en la meta "Mínimo y estándar: los del hábito X (15 min · 45 min). Se cambian en el hábito." si el frente tiene hábito, o los dos campos si no; cambia al elegir otro frente. El asistente no los pide en Objetivo (`noStdMin`); con "No por ahora" pide solo esos dos (`wz-gmin`, `wz-gstd`) si hay objetivo. `readGoalFields` conserva los valores viejos cuando el campo no está. Metas → Plan muestra los del hábito. Se eligió no poner un enlace a editar el hábito dentro del formulario de la meta porque abrirlo perdería lo que llevas escrito.
 
 **Listo cuando:** en ningún flujo se piden dos veces el mínimo y el estándar del mismo frente, los datos antiguos siguen mostrándose bien y `node tests/run.mjs` sigue pasando los casos del bosque.
 
@@ -186,7 +187,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 
 **Listo cuando:** con la hora simulada (por ejemplo con `page.clock` de Playwright), la línea cambia al pasar `planBTime`.
 
-### Tarea 3: Copia de seguridad *(fase 1 · hecha, falta publicar)*
+### Tarea 3: Copia de seguridad *(fase 1 · hecha)*
 
 **Hacer:**
 - Agregar la capability `downloads` (publicar con `capabilities: {db:{rules:[{path:"",read:"owner",write:"owner"}]}, downloads:true}`, repitiendo la regla de `db` completa).

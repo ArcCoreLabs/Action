@@ -320,6 +320,54 @@ for (const scheme of ['light', 'dark']){
   ok((await store(p)).fronts.find(f => f.id === 'h1').status === 'active', 'un hábito congelado se activa aunque haya 2 proyectos');
   await p.close();
 }
+// ---------- 5b. un solo mínimo y un solo estándar por frente ----------
+console.log('\nUn solo mínimo y estándar');
+{ // asistente de proyecto: la meta no los pide; el hábito sí
+  let p = await open('light', { 'meta/settings':{}, 'meta/focus':{ days:{} } });
+  await p.click('text=Crear tu primer frente'); await p.fill('#wz-name', 'CCFA'); await p.click('[data-act=wz-next]'); await p.click('[data-act=wz-next]');
+  ok(await p.locator('#g-title').count() === 1 && await p.locator('#g-standard').count() === 0 && await p.locator('#g-minimum').count() === 0, 'el paso Objetivo no pide mínimo ni estándar');
+  await p.fill('#g-title', 'Aprobar la CCFA'); await p.click('[data-act=wz-next]');
+  await p.click('[data-act=wz-habit][data-v="1"]');
+  ok(await p.locator('#h-m-w').isVisible() && await p.locator('#h-s-w').isVisible(), 'el paso Hábito los pide');
+  await p.fill('#h-m-w', '15 min'); await p.fill('#h-s-w', '45 min'); await p.click('[data-act=wz-create]'); await p.waitForTimeout(100);
+  let s = await store(p); ok(s.habits[0].minimum === '15 min' && !s.goals[0].minimum && !s.goals[0].standard, 'quedan solo en el hábito');
+  // editar la meta de un proyecto con hábito: muestra los del hábito y no los pide
+  await nav(p, 'metas'); await p.click('[data-act=goal-sheet]'); await p.click('[data-act=goal-edit]');
+  ok(await p.locator('#g-standard').count() === 0 && /los del hábito CCFA \(15 min · 45 min\)/.test(await p.locator('#g-stdmin').textContent()), 'la meta muestra los del hábito en solo lectura');
+  await p.click('[data-form=goal] button[type=submit]'); await p.waitForTimeout(80);
+  await p.locator('.goal details summary').first().click();
+  ok(/Mínimo innegociable15 min/.test(await p.locator('.goal details').first().textContent()), 'Metas → Plan muestra el mínimo del hábito');
+  ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
+  // "No por ahora": solo mínimo y estándar, guardados en la meta
+  p = await open('light', { 'meta/settings':{}, 'meta/focus':{ days:{} } });
+  await p.click('text=Crear tu primer frente'); await p.fill('#wz-name', 'Inglés'); await p.click('[data-act=wz-next]'); await p.click('[data-act=wz-next]');
+  await p.fill('#g-title', 'Pasar el B2'); await p.click('[data-act=wz-next]'); await p.click('[data-act=wz-habit][data-v="0"]');
+  ok(await p.locator('#wz-gmin').isVisible() && await p.locator('#h-m-w').count() === 0, 'sin hábito pide solo mínimo y estándar');
+  await p.fill('#wz-gmin', '10 min'); await p.fill('#wz-gstd', '30 min'); await p.click('[data-act=wz-create]'); await p.waitForTimeout(100);
+  s = await store(p); ok(s.goals[0].minimum === '10 min' && s.goals[0].standard === '30 min' && !s.habits.length, 'se guardan en el objetivo');
+  // objetivo sin hábito: el formulario los pide; datos viejos con los dos no se pierden al editar
+  await nav(p, 'metas'); await p.click('[data-act=goal-sheet]'); await p.click('[data-act=goal-edit]');
+  ok(await p.locator('#g-minimum').inputValue() === '10 min', 'sin hábito, la meta los pide y muestra lo guardado');
+  await p.click('[data-act=close]'); await p.close();
+  // sin hábito ni objetivo no pregunta nada
+  p = await open('light', { 'meta/settings':{}, 'meta/focus':{ days:{} } });
+  await p.click('text=Crear tu primer frente'); await p.fill('#wz-name', 'Varios'); await p.click('[data-act=wz-next]'); await p.click('[data-act=wz-next]'); await p.click('[data-act=wz-skip]');
+  await p.click('[data-act=wz-habit][data-v="0"]'); ok(await p.locator('#wz-gmin').count() === 0, 'sin objetivo ni hábito no pide mínimo'); await p.close();
+  // datos viejos: meta con su propio mínimo y hábito con otro; manda el del hábito y la meta conserva el suyo al guardar
+  const old = { 'fronts/p1':{ name:'CCFA', status:'active', order:1, created:1 }, 'habits/h1':{ name:'CCFA', minimum:'20 min', standard:'1 h', days:[1,2,3,4,5], frontId:'p1', log:{}, order:1, created:'2026-09-01' },
+    'goals/g1':{ frontId:'p1', title:'Aprobar', start:'2026-10-01', deadline:'2026-10-28', minimum:'5 min viejo', standard:'30 min viejo', weekly:[], premortem:[], created:1 }, 'meta/settings':{}, 'meta/focus':{ days:{} } };
+  p = await open('light', old); await nav(p, 'metas'); await p.locator('.goal details summary').first().click();
+  ok(/20 min/.test(await p.locator('.goal details').first().textContent()) && !/5 min viejo/.test(await p.locator('.goal details').first().textContent()), 'con datos viejos se ve el mínimo del hábito');
+  await p.click('[data-act=goal-sheet]'); await p.click('[data-act=goal-edit]'); await p.click('[data-form=goal] button[type=submit]'); await p.waitForTimeout(80);
+  s = await store(p); ok(s.goals[0].minimum === '5 min viejo', 'guardar la meta no borra su mínimo viejo');
+  // nuevo objetivo: al cambiar de frente cambian los campos
+  const two = { ...old, 'fronts/p2':{ name:'THM', status:'active', order:2, created:2 } };
+  p.close(); p = await open('light', two); await nav(p, 'metas'); await p.click('.dash[data-act=goal-new]');
+  await p.selectOption('#g-front', 'p2'); ok(await p.locator('#g-minimum').count() === 1, 'un frente sin hábito pide mínimo');
+  await p.selectOption('#g-front', 'p1'); ok(await p.locator('#g-minimum').count() === 0 && await p.locator('#g-stdmin-habit').count() === 1, 'un frente con hábito muestra el del hábito');
+  ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
+}
+
 // ---------- 6. copia de seguridad ----------
 console.log('\nCopia de seguridad');
 {

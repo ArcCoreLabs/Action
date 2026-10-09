@@ -892,7 +892,8 @@ VIEWS.metas = function(){
     const pm = (g.premortem || []).filter(p => p && (p.cause || p.counter));
     const items = Array.from({length:N}, (_, i) => ({...(weekly[i] || {}), i}));
     const hk = isHabitFront(f), all = hk && forestOn(g) ? forestDays(g, true) : null, fst = all ? forestStats(g, all) : null, hit = fst ? fst.trees + fst.sprouts : 0;
-    const hsF = S.habits.filter(h => h.frontId === g.frontId), plan = all ? all.filter(x => x.lvl || (x.d >= today() ? hsF.some(h => daysOn(h, x.d)) : x.state !== "rest")).length : 0; // días que tocan // un hábito avanza por días, no por semanas
+    const hsF = S.habits.filter(h => h.frontId === g.frontId), gMin = hsF.length ? hsF[0].minimum : g.minimum, gStd = hsF.length ? hsF[0].standard : g.standard; // fuente única: el hábito
+    const plan = all ? all.filter(x => x.lvl || (x.d >= today() ? hsF.some(h => daysOn(h, x.d)) : x.state !== "rest")).length : 0; // días que tocan: un hábito avanza por días, no por semanas
     return `<section class="goal">
       <div class="front-head"><div class="tmain"><span class="tmeta">${esc(f ? f.name : "Sin frente")}</span><h2>${esc(g.title || "Objetivo sin nombre")}</h2></div>
         <button class="more" data-act="goal-sheet" data-id="${g.id}" aria-label="Opciones">${ICON.more}</button></div>
@@ -902,9 +903,9 @@ VIEWS.metas = function(){
       ${items.length && !hk ? `<div class="list">${items.map(w => `<div class="trow ${w.done ? "done" : ""} ${w.i + 1 === wk ? "cur" : ""}">
         <button class="check ${w.done ? "on" : ""}" data-act="goal-week" data-id="${g.id}" data-i="${w.i}" aria-label="Marcar semana ${w.i + 1}">${ICON.check}</button>
         <div class="tmain"><span class="ttitle">${w.text ? esc(w.text) : '<span class="muted">Sin definir</span>'}</span><span class="tmeta">Semana ${w.i + 1}${w.i + 1 === wk ? " · esta semana" : ""}</span></div></div>`).join("")}</div>` : ""}
-      ${(g.minimum || g.trigger || g.standard || g.why || pm.length) ? `<details><summary>Plan</summary><div class="d-body kvs">
-        ${g.minimum ? `<dl class="kv"><dt>Mínimo innegociable</dt><dd>${esc(g.minimum)}</dd></dl>` : ""}
-        ${g.standard ? `<dl class="kv"><dt>Estándar</dt><dd>${esc(g.standard)}</dd></dl>` : ""}
+      ${(gMin || g.trigger || gStd || g.why || pm.length) ? `<details><summary>Plan</summary><div class="d-body kvs">
+        ${gMin ? `<dl class="kv"><dt>Mínimo innegociable</dt><dd>${esc(gMin)}</dd></dl>` : ""}
+        ${gStd ? `<dl class="kv"><dt>Estándar</dt><dd>${esc(gStd)}</dd></dl>` : ""}
         ${g.trigger ? `<dl class="kv"><dt>Disparador</dt><dd>${esc(g.trigger)}</dd></dl>` : ""}
         ${g.why ? `<dl class="kv"><dt>Por qué</dt><dd>${esc(g.why)}</dd></dl>` : ""}
         ${pm.length ? `<dl class="kv"><dt>¿Qué podría salir mal?</dt><dd class="pm">${pm.map(p => `<div>${esc(p.cause)}<span>→ ${esc(p.counter)}</span></div>`).join("")}</dd></dl>` : ""}
@@ -1076,7 +1077,13 @@ function weekInputs(n, vals){
 /* ----- formularios compartidos: el módulo y el asistente usan exactamente los mismos ----- */
 const PH_PM = [["Me aburrí a mitad de camino"],["Llegué cansado y lo aplacé"],["Me distraje con otro frente"]];
 const fixedSelect = (id, name) => `<select id="${id}" disabled><option>${esc(name)}</option></select>`;
-function goalFields(g, opts = {}){ // opts.compact: solo qué y fechas; lo demás plegado (hábitos)
+function stdMinHtml(fid, g){ // un solo mínimo y estándar por frente: si el frente tiene hábito, mandan los del hábito
+  const h = fid && S.habits.find(x => x.frontId === fid);
+  if (h) return `<p class="tmeta" id="g-stdmin-habit">Mínimo y estándar: los del hábito <b style="color:var(--ink)">${esc(h.name)}</b> (${esc(h.minimum || "sin mínimo")} · ${esc(h.standard || "sin estándar")}). Se cambian en el hábito.</p>`;
+  return `<label class="field" for="g-standard">Estándar<span class="hint">Lo ideal en un día normal.</span><textarea class="auto" rows="1" id="g-standard" placeholder="Ej: 45 min, lun a vie">${esc((g || {}).standard || "")}</textarea></label>
+    <label class="field" for="g-minimum">Mínimo innegociable<span class="hint">Lo que haces aunque estés destruido.</span><textarea class="auto" rows="1" id="g-minimum" placeholder="Ej: 15 minutos">${esc((g || {}).minimum || "")}</textarea></label>`;
+}
+function goalFields(g, opts = {}){ // opts.compact: solo qué y fechas; lo demás plegado (hábitos) · opts.noStdMin: sin mínimo ni estándar (asistente)
   g = g || {};
   const c = !!opts.compact;
   const start = g.start || (c ? today() : (dow(today()) === 1 ? today() : addDays(monday(today()), 7)));
@@ -1093,9 +1100,8 @@ function goalFields(g, opts = {}){ // opts.compact: solo qué y fechas; lo demá
   const dates = `
     <div class="row-form" style="flex-wrap:wrap"><label class="field" for="g-start" style="flex:1;min-width:140px">Inicio<input type="date" id="g-start" value="${start}"></label>
       <label class="field" for="g-deadline" style="flex:1;min-width:140px">Fecha límite<input type="date" id="g-deadline" value="${deadline}"></label></div>`;
-  const stdMin = `
-    <label class="field" for="g-standard">Estándar<span class="hint">Lo ideal en un día normal.</span><textarea class="auto" rows="1" id="g-standard" placeholder="Ej: 45 min, lun a vie">${esc(g.standard || "")}</textarea></label>
-    <label class="field" for="g-minimum">Mínimo innegociable<span class="hint">Lo que haces aunque estés destruido.</span><textarea class="auto" rows="1" id="g-minimum" placeholder="Ej: 15 minutos">${esc(g.minimum || "")}</textarea></label>`;
+  const stdMin = opts.noStdMin ? "" : `
+    <div class="stack" id="g-stdmin" style="gap:14px">${stdMinHtml(g.frontId || opts.frontId || (opts.fixedFrontName ? "" : (S.fronts.slice().sort(byOrder)[0] || {}).id), g)}</div>`;
   const trigger = `
     <label class="field" for="g-trigger">Disparador<span class="hint">Cuando [disparador], haré [acción] en [lugar].</span><textarea class="auto" rows="1" id="g-trigger" placeholder="Ej: al llegar del trabajo">${esc(g.trigger || "")}</textarea></label>`;
   const rest = (c ? "" : `
@@ -1114,7 +1120,7 @@ function readGoalFields(old = {}){
   const el = id => document.getElementById(id), val = id => el(id) ? el(id).value.trim() : "";
   const start = val("g-start"), deadline = val("g-deadline"), nW = goalWeeks({start, deadline}), fs = el("g-front");
   return { frontId: fs && !fs.disabled ? fs.value : old.frontId, title:val("g-title"), why:val("g-why"), start, deadline,
-    standard:val("g-standard"), minimum:val("g-minimum"), trigger:val("g-trigger"),
+    standard:el("g-standard") ? val("g-standard") : old.standard || "", minimum:el("g-minimum") ? val("g-minimum") : old.minimum || "", trigger:val("g-trigger"),
     weekly:Array.from({length:nW}, (_, i) => ({text:el("g-w" + i) ? val("g-w" + i) : ((old.weekly || [])[i] || {}).text || "", done:!!((old.weekly || [])[i] || {}).done})),
     premortem:[0,1,2].map(i => ({cause:val("g-pc" + i), counter:val("g-pk" + i)})), rewardMid:val("g-rm"), rewardEnd:val("g-re") };
 }
@@ -1343,6 +1349,7 @@ function wzCapture(){
   if (cur === "front"){ const n = $("#wz-name"), o = $("#wz-note"); if (n) W.name = n.value.trim(); if (o) W.note = o.value.trim(); }
   if (cur === "goal" && $("#g-title")) W.goal = readGoalFields(W.goal);
   if (cur === "habit" && W.wantHabit && $("#h-d-w")) W.habit = {...W.habit, ...readHabitFields("w")};
+  if (cur === "habit" && W.wantHabit === false && $("#wz-gmin")) W.goal = {...W.goal, minimum:$("#wz-gmin").value.trim(), standard:$("#wz-gstd").value.trim()};
 }
 function wzRedraw(){ $("#modal").innerHTML = wizardRender(); growAll(); const f = $("#modal [autofocus]"); if (f) f.focus(); $("#modal .sheet") && ($("#modal .sheet").scrollTop = 0); }
 function wizardRender(){
@@ -1368,7 +1375,7 @@ function wizardRender(){
     ${goalFields(W.goal, {compact:true})}
     <div class="wz-nav">${back}<span style="display:flex;gap:8px"><button class="btn" data-act="wz-skip">Sin objetivo</button><button class="btn primary" data-act="wz-create">Crear</button></span></div>`
     : `<h3 class="wz-q">Objetivo de ${nm}</h3>
-    ${goalFields(W.goal, {fixedFrontName:W.name})}
+    ${goalFields(W.goal, {fixedFrontName:W.name, noStdMin:true})}
     <div class="wz-nav">${back}<span style="display:flex;gap:8px"><button class="btn" data-act="wz-skip">Sin objetivo</button>${next}</span></div>`;
   if (cur === "habit" && hk) body = `<h3 class="wz-q">¿Cuánto tiempo al día?</h3>
     <p class="muted" style="font-size:14px">En Hoy tocas ▶ y al terminar el tiempo se marca solo. Sin tareas.</p>
@@ -1380,6 +1387,9 @@ function wizardRender(){
     <div class="stack"><button class="opt ${W.wantHabit === true ? "sel" : ""}" data-act="wz-habit" data-v="1"><span class="grow">Sí, crear hábito</span></button>
       <button class="opt ${W.wantHabit === false ? "sel" : ""}" data-act="wz-habit" data-v="0"><span class="grow">No por ahora<small>Puedes añadirlo después</small></span></button></div>
     ${W.wantHabit ? `<div class="stack" style="gap:14px">${habitFields(W.habit, "w", {fixedFrontName:W.name})}</div>` : ""}
+    ${W.wantHabit === false && W.goal.title ? `<div class="stack" style="gap:14px"><p class="muted" style="font-size:13px">Sin hábito, el mínimo y el estándar quedan en el objetivo.</p>
+      <label class="field" for="wz-gmin">Mínimo innegociable<span class="hint">Lo que haces aunque estés destruido.</span><input type="text" id="wz-gmin" value="${esc(W.goal.minimum || "")}" placeholder="Ej: 15 minutos" autocomplete="off"></label>
+      <label class="field" for="wz-gstd">Estándar<span class="hint">Lo ideal en un día normal.</span><input type="text" id="wz-gstd" value="${esc(W.goal.standard || "")}" placeholder="Ej: 45 min, lun a vie" autocomplete="off"></label></div>` : ""}
     ${W.wantHabit !== null ? `<p class="tmeta">Vas a crear <b style="color:var(--ink)">${nm}</b><span class="sep">·</span>${sum}</p>` : ""}
     <div class="wz-nav">${back}${create}</div>`; }
   return sheet(hk ? "Nuevo hábito" : "Nuevo frente", top + body);
@@ -1678,6 +1688,7 @@ document.addEventListener("input", e => {
 document.addEventListener("change", e => {
   if (e.target.matches("[data-review-check]")) saveReview(false);
   if (e.target.id === "restore-file") restorePick(e.target);
+  if (e.target.id === "g-front" && $("#g-stdmin")){ $("#g-stdmin").innerHTML = stdMinHtml(e.target.value, {}); growAll(); }
   if (e.target.matches("[data-htime]")){ const box = e.target.closest(".hf"); if (box) box.dataset.timed = e.target.value ? "1" : "0"; }
   if (e.target.matches("#g-start,#g-deadline")){
     const st = $("#g-start").value, dl = $("#g-deadline").value, box = $("#g-weeks"); if (!box || !st || !dl) return;
