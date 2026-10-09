@@ -488,40 +488,62 @@ console.log('\nCopia de seguridad');
 }
 // ---------- 7. hojas en iPhone ----------
 console.log('\nHojas en iPhone');
-{ // el iPhone da a los campos de hora y fecha un ancho propio que no respeta width:100%; se simula de dos formas:
-  // un ancho mínimo del campo (como el del navegador: sin especificidad) y un contenido interno más ancho que la hoja
-  const IOS = ':where(input[type=time],input[type=date]){min-width:520px} input[type=time]::-webkit-datetime-edit,input[type=date]::-webkit-datetime-edit{min-width:520px}';
-  const fits = p => p.evaluate(() => { const s = document.querySelector('#modal .sheet'), r = s.getBoundingClientRect();
-    return s.scrollWidth <= s.clientWidth && [...s.querySelectorAll('input:not([hidden]),textarea,select,.btn,.opt')].every(x => x.getBoundingClientRect().right <= r.right + .5); });
+{ // con su aspecto nativo, el iPhone (RenderThemeIOS) pone a los campos de hora y fecha relleno de .5em y box-sizing:content-box
+  // por encima del CSS; aquí se imita en cada campo que siga con aspecto nativo y se mide contra el borde del contenido de la hoja
+  const fits = p => p.evaluate(() => { const s = document.querySelector('#modal .sheet'), edge = s.getBoundingClientRect().right - parseFloat(getComputedStyle(s).paddingRight) + .5;
+    for (const e of s.querySelectorAll('input[type=date],input[type=time]')) if (getComputedStyle(e).appearance !== 'none') e.style.cssText += ';box-sizing:content-box!important;padding:0 7px!important';
+    return s.scrollWidth <= s.clientWidth && [...s.querySelectorAll('input:not([hidden]),textarea,select,.btn,.opt')].every(x => x.getBoundingClientRect().right <= edge); });
+  const textFits = p => p.evaluate(() => { const s = document.querySelector('#modal .sheet'), edge = s.getBoundingClientRect().right - parseFloat(getComputedStyle(s).paddingRight) + .5, r = document.createRange();
+    r.selectNodeContents(s); return [...r.getClientRects()].every(x => x.right <= edge); });
   for (const scheme of ['light', 'dark']){
-    const p = await open(scheme, seedGoal({ start:add(TODAY, -3), days:28 })); await p.addStyleTag({ content:IOS });
+    const p = await open(scheme, seedGoal({ start:add(TODAY, -3), days:28 }));
     await p.click('[data-act=settings]'); ok(await fits(p), `${scheme}: Ajustes no se sale por la derecha con los campos de hora del iPhone`);
     await p.screenshot({ path:path.join(out, `ajustes-iphone-${scheme}.png`) }); await p.click('[data-act=close]');
     await nav(p, 'metas'); await p.click('[data-act=goal-sheet]'); await p.click('[data-act=goal-edit]');
     ok(await fits(p), `${scheme}: Editar objetivo no se sale con los campos de fecha del iPhone`); await p.click('[data-act=close]');
     ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
-    const w = await open(scheme); await w.addStyleTag({ content:IOS });
+    const w = await open(scheme);
     await w.click('text=Crear tu primer frente'); await w.fill('#wz-name', 'Nuevo'); await w.click('[data-act=wz-next]'); await w.click('[data-act=wz-next]');
     ok(await w.locator('#g-start').count() === 1 && await fits(w), `${scheme}: el paso del objetivo en el asistente no se sale`); await w.close();
   }
-  // con una hoja abierta el fondo no se mueve; al cerrarla vuelve a moverse desde donde estaba
-  const p = await open('light', seedGoal({ start:add(TODAY, -3), days:28 })); await p.addStyleTag({ content:'main{min-height:3000px}' });
-  await p.evaluate(() => window.scrollTo(0, 300)); await p.click('[data-act=settings]');
+  { // un enlace pegado como título baja de línea dentro de la hoja en vez de cortarse
+    const url = 'https://tryhackme.com/room/owaspjuiceshopxssadvancedchallenge';
+    const p = await open('light', { ...base2(), 'tasks/u1':{ title:url, frontId:'p1', minutes:30, slot:null, date:null, done:false, created:1 } });
+    await p.click('text=Elegir tarea principal'); ok(await textFits(p), 'un enlace largo cabe en "Elegir tarea principal"');
+    await p.click('[data-act=pick-do] >> nth=0'); await p.waitForTimeout(100); await p.click('.main-task [data-act=task-sheet]');
+    ok(await textFits(p), 'un enlace largo cabe en las opciones de la tarea'); ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
+  }
+  // en táctil, con una hoja abierta el fondo no se mueve al arrastrar el dedo; al cerrarla vuelve a moverse desde donde estaba
+  const touch = async seed => { const p = await b.newPage({ viewport:{ width:390, height:860 }, hasTouch:true, isMobile:true }); p.setDefaultTimeout(4000); p.errs = []; p.on('pageerror', e => p.errs.push(e.message));
+    await p.clock.setFixedTime(new Date(NOW)); await p.addInitScript(s => { window.__SEED = s; }, seed); await p.goto('file://' + page); await p.waitForSelector('.sec-head'); return p; };
+  const p = await touch(seedGoal({ start:add(TODAY, -3), days:28 })); await p.addStyleTag({ content:'main{min-height:3000px}' });
+  const cdp = await p.context().newCDPSession(p), sy = () => p.evaluate(() => window.scrollY);
+  const settle = async () => { let a = -1, c = await sy(); while (a !== c){ await p.waitForTimeout(120); a = c; c = await sy(); } return c; }; // espera a que termine la inercia
+  const drag = async (y, d) => { await cdp.send('Input.dispatchTouchEvent', { type:'touchStart', touchPoints:[{ x:195, y }] }); // dedo real: empieza en y y sube d px
+    for (let i = 1; i <= 8; i++) await cdp.send('Input.dispatchTouchEvent', { type:'touchMove', touchPoints:[{ x:195, y:y - d * i / 8 }] });
+    await cdp.send('Input.dispatchTouchEvent', { type:'touchEnd', touchPoints:[] }); return settle(); };
+  await p.evaluate(() => window.scrollTo(0, 300)); await settle(); await p.tap('[data-act=settings]'); await p.waitForSelector('[data-act=close]');
   const over = () => p.evaluate(() => getComputedStyle(document.documentElement).overflowY);
   ok(await over() === 'hidden', 'con Ajustes abierto la página de atrás queda fija');
-  await p.mouse.move(195, 60); await p.mouse.wheel(0, 600); await p.mouse.move(195, 700); await p.mouse.wheel(0, 600); await p.waitForTimeout(150);
-  ok(await p.evaluate(() => window.scrollY) === 300, 'deslizar sobre la hoja o el fondo no mueve lo de atrás');
-  await p.click('[data-act=close]');
-  ok(await over() !== 'hidden' && await p.evaluate(() => window.scrollY) === 300, 'al cerrar, la página sigue donde estaba y se puede mover');
-  await p.mouse.wheel(0, 200); await p.waitForTimeout(150); ok(await p.evaluate(() => window.scrollY) > 300, 'después de cerrar la hoja la página vuelve a desplazarse');
+  ok(await drag(60, 40) === 300 && await drag(700, 200) === 300, 'arrastrar el dedo sobre el fondo o la hoja no mueve lo de atrás');
+  await p.tap('[data-act=close]');
+  ok(await over() !== 'hidden' && await sy() === 300, 'al cerrar, la página sigue donde estaba');
+  ok(await drag(600, 200) > 300, 'después de cerrar la hoja la página vuelve a desplazarse con el dedo');
   ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
   // el temporizador a pantalla completa también deja quieto el fondo
-  const q = await open('light', { ...base2(), ...readHabit() }); await q.click('[data-act=hfocus]');
+  const q = await touch({ ...base2(), ...readHabit() }); await q.tap('[data-act=hfocus]');
   ok(await q.evaluate(() => getComputedStyle(document.documentElement).overflowY) === 'hidden', 'con el temporizador abierto el fondo queda fijo');
-  await q.click('[data-act=focus-stop]'); await q.click('[data-act=focus-finish]'); await q.waitForTimeout(100);
+  await q.tap('[data-act=focus-stop]'); await q.tap('[data-act=focus-finish]'); await q.waitForTimeout(100);
   ok(await q.locator('#focus .focus').count() === 0 && await q.evaluate(() => getComputedStyle(document.documentElement).overflowY) !== 'hidden', 'al cerrar el temporizador se libera');
   ok(!q.errs.length, 'sin errores ' + q.errs.join('|')); await q.close();
 }
+// escritorio con barra de desplazamiento visible: abrir una hoja no hace saltar la columna
+{ const bs = await pw.chromium.launch({ ignoreDefaultArgs:['--hide-scrollbars'] }), p = await bs.newPage({ viewport:{ width:1280, height:800 } });
+  await p.clock.setFixedTime(new Date(NOW)); await p.addInitScript(s => { window.__SEED = s; }, seedGoal({ start:add(TODAY, -3), days:28 }));
+  await p.goto('file://' + page); await p.waitForSelector('.sec-head'); await p.addStyleTag({ content:'main{min-height:3000px}' });
+  const x = () => p.evaluate(() => document.querySelector('main').getBoundingClientRect().x), x0 = await x();
+  await p.click('[data-act=settings]'); const x1 = await x(); await p.click('[data-act=close]');
+  ok(x0 === x1 && x1 === await x(), `en escritorio la columna no salta al abrir una hoja (${x0} → ${x1})`); await bs.close(); }
 // escritorio
 { const p = await open('light', seedGoal({ start:add(TODAY, -16), days:28, levels:pattern(add(TODAY, -16), add(TODAY, -1)) }), 1280);
   await nav(p, 'metas'); await p.screenshot({ path:path.join(out, 'metas-escritorio.png') }); ok(!p.errs.length, 'escritorio sin errores'); await p.close(); }

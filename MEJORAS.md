@@ -103,6 +103,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 - **Tamaños del estilo compacto (bloque `v4` del CSS):** casillas redondas de 18 px como los puntos de la semana (con área táctil ampliada; ▶, ⋯, «!», los chips y los botones de los avisos también la tienen), títulos de fila 14 px, detalles 11,5 px, títulos de sección 14 px, filas de 42 px. Lo nuevo usa esos mismos tamaños.
 - **Escrituras:** una por documento a la vez (usa `put`). Nunca escribas desde un render ni desde un callback de snapshot.
 - **Formularios con texto libre:** usa `openModal(fn, false)` y campos `textarea.auto` para textos largos.
+- **Hojas en iPhone (bloque «iPhone» al final del CSS):** los campos de hora y fecha llevan `appearance:none`; con su aspecto nativo, el iPhone les pone relleno y ancho propios por encima del CSS y se salen de la hoja. El fondo se bloquea solo en táctil (`pointer:coarse`), así en computador la columna no salta al quitar la barra. Los textos de las hojas bajan de línea aunque sean un enlace largo. Lo cubre «Hojas en iPhone» en `tests/run.mjs`.
 - **Toda función nueva necesita su "!":** actualiza `HELP` y `guideSheet()`.
 - **No reintroduzcas términos viejos:** "Tarea Crítica", "P1/P2", "secundaria", "12 semanas", "menú", "Hito semanal".
 
