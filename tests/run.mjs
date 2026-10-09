@@ -124,6 +124,7 @@ for (const scheme of ['light', 'dark']){
   ok(lb.includes('4 árboles') && lb.includes('2 marchitos') && lb.includes('2 secos'), `${scheme}: fallar 1 marchita, fallar 2 seca, cumplir salva ("${lb}")`);
   ok(await p.locator('.forest .bare').count() === 1, `${scheme}: desde el tercer fallo queda tierra`);
   ok(await p.locator('.forest .today').count() === 1, `${scheme}: se marca el espacio de hoy`);
+  ok(await p.evaluate(() => document.querySelector('.forest svg').lastElementChild.classList.contains('today')), `${scheme}: el espacio de hoy se dibuja encima de los árboles`);
   await p.locator('.goal').first().screenshot({ path:path.join(out, `bosque-fallos-${scheme}.png`) }); await p.close();
   // ayer se marchitó: aviso en Hoy y hoy lo salvas
   start = add(TODAY, -5);
@@ -210,7 +211,7 @@ for (const scheme of ['light', 'dark']){
   ok(await p.locator('#h-t-w').inputValue() === '20' && await p.locator('#h-mm-w').isVisible() && !(await p.locator('#h-m-w').isVisible()), `${scheme}: propone 20 min con mínimo en minutos`);
   await p.screenshot({ path:path.join(out, `asistente-tiempo-${scheme}.png`) });
   await p.click('[data-act=wz-next]');
-  ok(await p.locator('#g-standard').count() === 0 && await p.locator('#g-title').isVisible(), `${scheme}: la meta del hábito es corta (sin mínimo ni estándar)`);
+  ok(await p.locator('#g-standard').count() === 0 && await p.locator('#g-weeks').count() === 0 && await p.locator('#g-title').isVisible(), `${scheme}: la meta del hábito es corta (sin mínimo, estándar ni semanas)`);
   await p.fill('#g-title', 'Terminar Dune');
   await p.screenshot({ path:path.join(out, `asistente-meta-${scheme}.png`) });
   await p.click('[data-act=wz-create]'); await p.waitForTimeout(120);
@@ -289,6 +290,28 @@ for (const scheme of ['light', 'dark']){
   ok(await p.locator('#g-standard').count() === 0 && await p.locator('details summary').filter({ hasText:'Más detalles' }).count() === 1, 'la meta de un hábito usa el formulario corto');
   await p.fill('#g-title', 'Terminar el libro'); await p.click('[data-form=goal] button[type=submit]'); await p.waitForTimeout(80);
   const g = (await store(p)).goals[0]; ok(g && g.frontId === 'h1' && g.start === TODAY, 'la meta queda ligada al hábito y empieza hoy');
+  ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
+}
+{ // meta de hábito: barra por días que tocan, sin "Esta semana", y editarla no borra textos viejos de semanas
+  const seed = { ...base2(), ...readHabit() }, L = {};
+  for (let d = '2026-09-28'; d <= '2026-10-07'; d = add(d, 1)){ const w = new Date(d + 'T12:00:00Z').getUTCDay(); if (w >= 1 && w <= 5) L[d] = 'full'; }
+  seed['habits/hb'] = { ...seed['habits/hb'], days:[1,2,3,4,5], log:L, created:'2026-09-28' };
+  seed['goals/g9'] = { frontId:'h1', title:'Terminar el libro', start:'2026-09-28', deadline:'2026-10-07', weekly:[{ text:'Cap 1-10', done:false }, { text:'', done:false }], premortem:[], created:1 };
+  const p = await open('light', seed); await nav(p, 'metas');
+  ok(await p.locator('.goal .bar > span').first().evaluate(e => e.style.width) === '100%', 'un hábito de lunes a viernes cumplido llena la barra (100 %)');
+  ok(/Terminó·8 días cumplidos/.test(await p.locator('.bar-legend').first().textContent()), 'la leyenda cuenta días cumplidos');
+  await nav(p, 'frentes'); ok(await p.locator('.front').filter({ hasText:'Leer' }).locator('.fg-week').count() === 0, 'Frentes no muestra "Esta semana" en un hábito');
+  await nav(p, 'metas'); await p.click('[data-act=goal-sheet]'); await p.click('[data-act=goal-edit]');
+  ok(await p.locator('#g-weeks').count() === 0, 'editar la meta de un hábito no muestra semanas');
+  await p.click('[data-form=goal] button[type=submit]'); await p.waitForTimeout(80);
+  ok((await store(p)).goals[0].weekly[0].text === 'Cap 1-10', 'guardar la meta no borra los textos de semanas que ya tenía');
+  // toques un poco fuera del dibujo pequeño
+  await nav(p, 'hoy');
+  const hit = await p.evaluate(() => { const r = (sel) => { const e = document.querySelector(sel); if (!e) return null; const b = e.getBoundingClientRect(); return { e, b }; };
+    const i = r('.sec-head .info'), m = r('.trow .chip-btn');
+    const at = (x, y) => document.elementFromPoint(x, y);
+    return { info: i && at(i.b.left + i.b.width / 2, i.b.top - 5) === i.e, chip: m && at(m.b.left + m.b.width / 2, m.b.top - 3) === m.e }; });
+  ok(hit.info && hit.chip, `tocar un poco fuera del "!" y de "Solo mínimo" sí los activa (${JSON.stringify(hit)})`);
   ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
 }
 { // activar un hábito congelado no choca con el máximo de 2 proyectos

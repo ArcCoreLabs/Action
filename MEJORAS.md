@@ -52,7 +52,7 @@ Cada fase termina con la app publicada y usable. No se empieza una fase sin cerr
 | **Hoy** | Fecha · Principal · Extras · Hábitos de hoy · puntos de la semana · Mañana (plan de noche) |
 | **Bandeja** | Captura rápida. Casilla = hecho. "Mover" = enviar a un frente |
 | **Frentes** | Proyectos activos (con su objetivo, la meta de esta semana, su hábito y sus tareas) · Hábitos · Congelados |
-| **Metas** | Visión · Objetivos (barra de progreso, bosque, semanas marcables, plan plegable) |
+| **Metas** | Visión · Objetivos (barra de progreso, bosque, semanas marcables, plan plegable). Un objetivo de hábito no tiene semanas: avanza por días ("Día 5 de 23 · 4 días cumplidos") |
 | **Semana** | Estadísticas · revisión del domingo (3 preguntas, limpieza, semana de cada objetivo) · revisiones anteriores |
 
 ### Modelo de datos (capability `db`)
@@ -94,13 +94,13 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 - **Eventos:** clics delegados con `data-act` → objeto `A`. Formularios con `data-form` → objeto `FORMS`.
 - **Tipos de frente:** `isHabitFront`, `projects` (solo estos cuentan para el máximo de 2); asistente por pasos `FLOW`, `HABIT0`, `wzCur`, `wzLast`, `wzGoalOk`; `goalFields(g, {compact})` (meta corta de los hábitos).
 - **Enfoque:** objeto `F` (`kind` "task" o "habit"), `focusOpen`, `focusHabit` (▶ de un hábito), `habitDone` (pantalla final), `renderFocus`, `tick`, `logFocus`, `habitTime` (guarda los minutos y marca el hábito).
-- **Bosque:** `forestOn`, `paused`, `forestMap` (nivel por día), `forestDays` (estado por día), `forestGoal`, `forestWilting`, `forestGrow` / `forestGrowMsg` (texto del aviso), `forestArt`, `forestSvg` (la isla), `forestStats`, `forestBlock`, `forestSeen` (animación), `TREES`, `ART`, `RANK`, `plural`, `daysOn` (días del hábito en una fecha), `keepMiss` (guarda la Principal fallada al moverla). Se calcula en memoria a partir de `tasks`, `habits` y `fronts.pauses`; no tiene colección propia.
+- **Bosque:** `forestOn`, `paused`, `forestMap` (nivel por día), `forestDays` (estado por día), `forestGoal`, `forestWilting`, `forestGrow` / `forestGrowMsg` (texto del aviso), `forestArt`, `hashStr`, `forestSpots` (lugares al azar), `forestSvg` (la isla), `forestStats`, `forestBlock`, `forestSeen` (animación), `TREES`, `ART`, `RANK`, `plural`, `daysOn` (días del hábito en una fecha), `keepMiss` (guarda la Principal fallada al moverla). Se calcula en memoria a partir de `tasks`, `habits` y `fronts.pauses`; no tiene colección propia.
 
 ### Reglas al editar
 
 - **Mantén un solo archivo autocontenido.** Solo se permiten CDNs de la lista blanca de Artifacts (las fuentes vienen de Google Fonts).
 - **Colores siempre con tokens CSS de `:root`**, con sus variantes oscuras ya definidas.
-- **Tamaños del estilo compacto (bloque `v4` del CSS):** casillas redondas de 18 px como los puntos de la semana (con área táctil ampliada), títulos de fila 14 px, detalles 11,5 px, títulos de sección 14 px, filas de 42 px. Lo nuevo usa esos mismos tamaños.
+- **Tamaños del estilo compacto (bloque `v4` del CSS):** casillas redondas de 18 px como los puntos de la semana (con área táctil ampliada; ▶, ⋯, «!», los chips y los botones de los avisos también la tienen), títulos de fila 14 px, detalles 11,5 px, títulos de sección 14 px, filas de 42 px. Lo nuevo usa esos mismos tamaños.
 - **Escrituras:** una por documento a la vez (usa `put`). Nunca escribas desde un render ni desde un callback de snapshot.
 - **Formularios con texto libre:** usa `openModal(fn, false)` y campos `textarea.auto` para textos largos.
 - **Toda función nueva necesita su "!":** actualiza `HELP` y `guideSheet()`.
@@ -130,7 +130,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 | **Por crecer** | Días después de hoy (pasto vacío) |
 
 - Los días que no tocan no cortan ni reinician la cuenta de fallos.
-- Isla cuadrada (lado = raíz del número de días, mínimo 3), un espacio por día, llenada desde el fondo hacia el frente. Los objetivos de más de 364 días se ven por bloques de 364: el que contiene hoy.
+- Isla cuadrada (lado = raíz del número de días, mínimo 3), un espacio por día. Cada día cae en un lugar al azar de toda la isla, fijo para cada objetivo (`forestSpots`, con semilla: id del objetivo + primer día del bloque). El rombo de hoy se dibuja encima de todo para que ningún árbol lo tape. Los objetivos de más de 364 días se ven por bloques de 364: el que contiene hoy.
 - El conteo suma árboles (con y sin fruto), brotes, salvados, marchitos y secos. La tierra no se cuenta.
 - Tres árboles geométricos (pino, redondo, ciprés), con luz desde la izquierda. Tokens: `--grass`, `--grass-2`, `--grass-side`, `--earth`, `--earth-2`, `--tree`, `--tree-2`, `--trunk`, `--wilt`, `--dead`, `--hi`, `--shade`, en claro y oscuro.
 
@@ -147,7 +147,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 
 **Hecho:**
 - **Dos tipos de frente** en el primer paso del asistente: **Proyecto** (tareas distintas, máximo 2 activos) o **Hábito** (lo mismo cada día; no ocupa cupo).
-- **El hábito pide solo el tiempo:** Tiempo al día (5 a 90 min, o "Sin tiempo fijo"), Mínimo en minutos y días (todos por defecto). Su meta con fecha es opcional y corta: qué + fechas (3 semanas desde hoy por defecto), lo demás plegado en "Más detalles".
+- **El hábito pide solo el tiempo:** Tiempo al día (5 a 90 min, o "Sin tiempo fijo"), Mínimo en minutos y días (todos por defecto). Su meta con fecha es opcional y corta: qué + fechas (3 semanas desde hoy por defecto), sin semanas; lo demás (por qué, disparador, riesgos, recompensas) plegado en "Más detalles". La barra se llena con los días cumplidos sobre los días que tocan.
 - **En Hoy → Hábitos**, un hábito con tiempo muestra **▶**. Al tocarlo, el temporizador arranca solo con lo que falta de hoy.
   - Al terminar el tiempo se marca solo (`full`) y el bosque crece.
   - Si paras antes y pasaste el mínimo, queda en `min` ("Mínimo cumplido. La racha sigue viva.").

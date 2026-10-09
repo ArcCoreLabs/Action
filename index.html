@@ -408,6 +408,17 @@ details>summary{font-size:13px}
 .day-tog span{width:32px;height:32px;font-size:12px}
 ul.help{font-size:14px}
 .toast{padding:9px 14px;font-size:13px}
+/* área táctil invisible, como la casilla: el dibujo sigue pequeño */
+.play,.more,.chip-btn,.info,.notice .text-btn{position:relative}
+.play::after,.more::after,.chip-btn::after{content:"";position:absolute;inset:-5px}
+.info::after{content:"";position:absolute;inset:-8px}
+.notice .text-btn::after{content:"";position:absolute;inset:-2px -5px}
+.check:not(.on):not(.half):hover{border-color:var(--muted)}
+.row-form .btn{align-self:stretch}
+.forest-count{font-size:11.5px}
+.ticket{padding:12px 14px}
+.tk-title{font-size:15.5px;line-height:1.3}
+.wz-step{font-size:10.5px}
 </style>
 
 
@@ -642,16 +653,17 @@ function forestSvg(g, days){
   for (let i = 0; i < side * side; i++){ const p = at(i); if ((p.c + p.r) % 2) ground += dia(p.x, p.y, "gr2"); }
   const spots = forestSpots(`${g.id}:${days.length ? days[0].d : ""}`, side); // cada día cae en un lugar al azar de todo el campo
   const items = days.map(x => ({x, p:at(spots[x.i])})).sort((a, b) => (a.p.c + a.p.r) - (b.p.c + b.p.r) || a.p.c - b.p.c);
+  let top = ""; // el espacio de hoy va encima de todo: con el bosque al azar, un árbol de adelante podía taparlo
   const objs = items.map(({x, p}) => {
     const cx = p.x, cy = p.y + H / 2, art = forestArt(x);
     let grow = "";
     if (x.d === t){ const lv = RANK[x.state] || 0, prev = forestSeen[g.id]; forestSeen[g.id] = lv; if (prev !== undefined && lv > prev) grow = ' class="grow"'; }
-    const mark = x.d === t ? dia(p.x, p.y, "today") : "";
+    if (x.d === t) top = dia(p.x, p.y, "today");
     const shadow = /tree|fruit|saved|wilt/.test(x.state) ? `<ellipse class="sh" cx="1.6" cy=".6" rx="${x.state === "saved" ? 3.6 : 5}" ry="${x.state === "saved" ? 1.6 : 2.2}"/>` : "";
-    return mark + (art ? `<g transform="translate(${cx} ${cy}) scale(.84)">${shadow}<g${grow}>${art}</g></g>` : "");
+    return (art ? `<g transform="translate(${cx} ${cy}) scale(.84)">${shadow}<g${grow}>${art}</g></g>` : "");
   }).join("");
   const px = Math.min(380, 120 + side * 26);
-  return `<svg viewBox="${L - 2} -18.5 ${side * W + 4} ${D + T + 21.5}" style="max-width:${px}px" aria-hidden="true">${ground}${objs}</svg>`;
+  return `<svg viewBox="${L - 2} -18.5 ${side * W + 4} ${D + T + 21.5}" style="max-width:${px}px" aria-hidden="true">${ground}${objs}${top}</svg>`;
 }
 function forestStats(g, days){
   const c = k => days.filter(x => k.includes(x.state)).length;
@@ -725,12 +737,13 @@ function render(){
   document.querySelectorAll("#nav button").forEach(b => b.setAttribute("aria-current", b.dataset.v === view ? "page" : "false"));
   const n = inbox().length, badge = $("#inboxBadge");
   badge.hidden = !n; badge.textContent = n;
-  const v = $("#view");
+  const v = $("#view"), y = window.scrollY;
   if (mode === "connecting" || (mode === "db" && ready.size < SOURCES.length)){
     v.innerHTML = '<div class="loading">Cargando tu sistema…</div>';
   } else {
     const banner = mode === "local" ? '<div class="banner"><b>Modo prueba.</b> No hay conexión con tu almacenamiento, así que lo que hagas aquí no se guarda. Abre la app desde tu cuenta de Claude para guardar y sincronizar.</div>' : "";
     v.innerHTML = banner + VIEWS[view]();
+    v.querySelectorAll("textarea.auto").forEach(autoGrow); if (window.scrollY !== y) window.scrollTo(0, y); // sin saltos al redibujar
   }
   if (modal.render && modal.live) $("#modal").innerHTML = modal.render();
   restoreFocus(k);
@@ -843,7 +856,7 @@ VIEWS.frentes = function(){
       ${(() => { const g = goalFor(f.id), h = S.habits.find(x => x.frontId === f.id);
         const gHtml = g ? (() => { const wk = goalWeek(g), n = goalWeeks(g), cur = (g.weekly || [])[Math.max(0, wk-1)];
           const tr = wk && forestOn(g) ? forestStats(g, forestDays(g)).trees : 0;
-          return `<span class="tmeta">${wk ? `Objetivo · ${hk && g.start && g.deadline ? `día ${Math.min(diffDays(g.start, today()) + 1, diffDays(g.start, g.deadline) + 1)} de ${diffDays(g.start, g.deadline) + 1}` : `semana ${wk} de ${n}`}${tr ? ` · ${plural(tr, "árbol", "árboles")}` : ""}` : `Objetivo · empieza el ${fmtShort(g.start)}`}</span><b>${esc(g.title)}</b>${cur && cur.text ? `<span class="fg-week">${wk ? "Esta semana" : "Primera semana"}: ${esc(cur.text)}</span>` : ""}`; })() : "";
+          return `<span class="tmeta">${wk ? `Objetivo · ${hk && g.start && g.deadline ? `día ${Math.min(diffDays(g.start, today()) + 1, diffDays(g.start, g.deadline) + 1)} de ${diffDays(g.start, g.deadline) + 1}` : `semana ${wk} de ${n}`}${tr ? ` · ${plural(tr, "árbol", "árboles")}` : ""}` : `Objetivo · empieza el ${fmtShort(g.start)}`}</span><b>${esc(g.title)}</b>${!hk && cur && cur.text ? `<span class="fg-week">${wk ? "Esta semana" : "Primera semana"}: ${esc(cur.text)}</span>` : ""}`; })() : "";
         const hHtml = h ? `<span class="tmeta fg-habit">Hábito · ${esc(daysLabel(h.days))}${h.minutes ? ` · ${h.minutes} min · mínimo ${h.minMinutes || h.minutes} min` : `${h.minimum ? ` · mínimo ${esc(h.minimum)}` : ""}${h.standard ? ` · estándar ${esc(h.standard)}` : ""}`}</span>` : "";
         const add = [!g ? `<button class="text-btn muted" data-act="goal-new" data-front="${f.id}">+ Objetivo</button>` : "", !h ? `<button class="text-btn muted" data-act="habit-quick" data-front="${f.id}">+ Hábito</button>` : ""].join("");
         return (g || h ? `<div class="front-goal">${gHtml}${hHtml}</div>` : "") + (add ? `<div class="front-add">${add}</div>` : ""); })()}
@@ -878,11 +891,12 @@ VIEWS.metas = function(){
     const elapsed = g.start && g.deadline ? Math.max(0, Math.min(100, diffDays(g.start, today()) / Math.max(1, diffDays(g.start, g.deadline)) * 100)) : 0;
     const pm = (g.premortem || []).filter(p => p && (p.cause || p.counter));
     const items = Array.from({length:N}, (_, i) => ({...(weekly[i] || {}), i}));
-    const hk = isHabitFront(f), fst = hk && forestOn(g) ? forestStats(g, forestDays(g, true)) : null, hit = fst ? fst.trees + fst.sprouts : 0; // un hábito avanza por días, no por semanas
+    const hk = isHabitFront(f), all = hk && forestOn(g) ? forestDays(g, true) : null, fst = all ? forestStats(g, all) : null, hit = fst ? fst.trees + fst.sprouts : 0;
+    const hsF = S.habits.filter(h => h.frontId === g.frontId), plan = all ? all.filter(x => x.lvl || (x.d >= today() ? hsF.some(h => daysOn(h, x.d)) : x.state !== "rest")).length : 0; // días que tocan // un hábito avanza por días, no por semanas
     return `<section class="goal">
       <div class="front-head"><div class="tmain"><span class="tmeta">${esc(f ? f.name : "Sin frente")}</span><h2>${esc(g.title || "Objetivo sin nombre")}</h2></div>
         <button class="more" data-act="goal-sheet" data-id="${g.id}" aria-label="Opciones">${ICON.more}</button></div>
-      <div><div class="bar"><span style="width:${fst ? hit / Math.max(1, fst.total) * 100 : doneN/N*100}%"></span><i style="left:${elapsed}%"></i></div>
+      <div><div class="bar"><span style="width:${fst ? hit / Math.max(1, plan) * 100 : doneN/N*100}%"></span><i style="left:${elapsed}%"></i></div>
         <p class="bar-legend">${join([g.start && today() < g.start ? `Empieza el ${fmtShort(g.start)}` : g.deadline && today() > g.deadline ? (hk ? "Terminó" : doneN === N ? "Cumplido" : "Plazo vencido") : fst ? `Día ${diffDays(g.start, today()) + 1} de ${fst.total}` : `Semana ${wk} de ${N}`, fst ? plural(hit, "día cumplido", "días cumplidos") : `${doneN}/${N} semanas cumplidas`, g.deadline && today() <= g.deadline ? `faltan ${diffDays(today(), g.deadline)} días` : ""])}</p></div>
       ${forestOn(g) ? forestBlock(g) : ""}
       ${items.length && !hk ? `<div class="list">${items.map(w => `<div class="trow ${w.done ? "done" : ""} ${w.i + 1 === wk ? "cur" : ""}">
@@ -958,7 +972,7 @@ const HELP = {
   congelados:["Congelados", ["Proyectos que te interesan pero no son para ahora.", "No se pierden: quedan guardados con sus tareas.", "Toca <b>Activar</b> cuando tengas menos de 2 frentes activos."]],
   metas:["Metas", ["De lo grande a lo pequeño:", "<b>Visión</b>: hacia dónde vas en años.", "<b>Objetivo</b>: lo que logras entre una fecha de inicio y una fecha límite.", "<b>Semanas</b>: lo que debe estar hecho cada domingo.", "Las tareas del día van en Frentes."]],
   vision:["Visión", ["Una o dos frases sobre hacia dónde vas en los próximos años.", "Solo da dirección, no es una tarea."]],
-  objetivos:["Objetivos", ["Un resultado medible con fecha límite, como “Aprobar la CCFA”.", "Las semanas salen solas de tus fechas: 4 semanas si pones un mes, 12 si pones tres.", "Escribe qué debe estar hecho cada semana y márcalo el domingo.", "En <b>Plan</b> quedan tu mínimo, cuándo lo haces y qué podría salir mal.", "El <b>bosque</b> crece con cada día que avanzas en el frente.", "La línea naranja de la barra marca el tiempo que ha pasado."]],
+  objetivos:["Objetivos", ["Un resultado medible con fecha límite, como “Aprobar la CCFA”.", "Las semanas salen solas de tus fechas: 4 semanas si pones un mes, 12 si pones tres.", "Si es de un hábito no tiene semanas: avanza por días (Día 5 de 23 · 4 días cumplidos).", "Escribe qué debe estar hecho cada semana y márcalo el domingo.", "En <b>Plan</b> quedan tu mínimo, cuándo lo haces y qué podría salir mal.", "El <b>bosque</b> crece con cada día que avanzas en el frente.", "La línea naranja de la barra marca el tiempo que ha pasado."]],
   semana:["Semana", ["Arriba ves tus números de la semana.", "El domingo, en 30 minutos, respondes la revisión y defines la meta de la próxima semana."]],
   revision:["Revisión", ["Responde con frases cortas.", "En <b>¿Qué voy a cambiar?</b> cambia el sistema, no a ti: un horario, un mínimo, una regla.", "Marca si cumpliste la semana de cada objetivo y escribe qué debe estar hecho la próxima.", "Después crea en Frentes las tareas de esa semana."]],
   anteriores:["Anteriores", ["Tus revisiones pasadas, para ver cómo vas."]],
@@ -971,7 +985,7 @@ function helpSheet(k){
 
 /* ================= modales ================= */
 const modal = { render:null, live:false };
-const autoGrow = el => { el.style.height = "auto"; el.style.height = Math.max(44, el.scrollHeight) + "px"; };
+const autoGrow = el => { const y = window.scrollY; el.style.height = "auto"; el.style.height = Math.max(44, el.scrollHeight) + "px"; if (window.scrollY !== y) window.scrollTo(0, y); };
 const growAll = () => requestAnimationFrame(() => document.querySelectorAll("textarea.auto").forEach(autoGrow));
 function openModal(fn, live = true){ modal.render = fn; modal.live = live; modal.guard = !live; $("#modal").innerHTML = fn(); growAll(); const f = $("#modal [autofocus]"); if (f) f.focus(); }
 function closeModal(){ modal.render = null; modal.live = false; $("#modal").innerHTML = ""; }
@@ -1083,9 +1097,9 @@ function goalFields(g, opts = {}){ // opts.compact: solo qué y fechas; lo demá
     <label class="field" for="g-minimum">Mínimo innegociable<span class="hint">Lo que haces aunque estés destruido.</span><textarea class="auto" rows="1" id="g-minimum" placeholder="Ej: 15 minutos">${esc(g.minimum || "")}</textarea></label>`;
   const trigger = `
     <label class="field" for="g-trigger">Disparador<span class="hint">Cuando [disparador], haré [acción] en [lugar].</span><textarea class="auto" rows="1" id="g-trigger" placeholder="Ej: al llegar del trabajo">${esc(g.trigger || "")}</textarea></label>`;
-  const rest = `
+  const rest = (c ? "" : `
     <div class="group-label">Semana a semana</div>
-    <div class="stack" id="g-weeks">${weekInputs(goalWeeks({start, deadline}), w.map(x => (x || {}).text || ""))}</div>
+    <div class="stack" id="g-weeks">${weekInputs(goalWeeks({start, deadline}), w.map(x => (x || {}).text || ""))}</div>`) + `
     <div class="group-label">¿Qué podría salir mal?</div><p class="muted" style="font-size:13px;margin-top:-6px">Imagina que llegó la fecha y no lo lograste. Escribe por qué y cómo lo evitas.</p>
     ${[0,1,2].map(i => `<div class="stack" style="gap:6px;padding:10px;border-radius:12px;background:var(--surface)"><textarea class="auto" rows="1" id="g-pc${i}" placeholder="Riesgo ${i+1}. Ej: ${esc(PH_PM[i][0])}">${esc((pm[i] || {}).cause || "")}</textarea><textarea class="auto" rows="1" id="g-pk${i}" placeholder="Cómo lo evito">${esc((pm[i] || {}).counter || "")}</textarea></div>`).join("")}
     <div class="group-label">Recompensas</div>
@@ -1100,7 +1114,7 @@ function readGoalFields(old = {}){
   const start = val("g-start"), deadline = val("g-deadline"), nW = goalWeeks({start, deadline}), fs = el("g-front");
   return { frontId: fs && !fs.disabled ? fs.value : old.frontId, title:val("g-title"), why:val("g-why"), start, deadline,
     standard:val("g-standard"), minimum:val("g-minimum"), trigger:val("g-trigger"),
-    weekly:Array.from({length:nW}, (_, i) => ({text:val("g-w" + i), done:!!((old.weekly || [])[i] || {}).done})),
+    weekly:Array.from({length:nW}, (_, i) => ({text:el("g-w" + i) ? val("g-w" + i) : ((old.weekly || [])[i] || {}).text || "", done:!!((old.weekly || [])[i] || {}).done})),
     premortem:[0,1,2].map(i => ({cause:val("g-pc" + i), counter:val("g-pk" + i)})), rewardMid:val("g-rm"), rewardEnd:val("g-re") };
 }
 const TIMES = [5,10,15,20,25,30,45,60,90], MINTIMES = [2,5,10,15,20,30];
@@ -1178,7 +1192,7 @@ function settingsSheet(){
 function guideSheet(){
   openModal(() => sheet("Guía", `<div class="guide stack">
     <h3>Cómo se conecta todo</h3>
-    <ol><li><b>Visión</b> (Metas): hacia dónde vas en años.</li><li><b>Frente</b>: un proyecto (tareas distintas, como THM o CCFA; máximo 2 activos) o un hábito (lo mismo cada día, como leer 20 minutos; no ocupa cupo).</li><li><b>Objetivo</b> del frente: un resultado con inicio y fecha límite. Las semanas salen de esas fechas.</li><li><b>Tareas</b> del frente: lo que haces para cumplir la meta de esta semana.</li><li><b>Principal</b> (Hoy): la tarea que eliges para cada día.</li><li><b>Hábito</b>: mide tu constancia. El de un proyecto se marca solo al terminar una tarea; el que tiene tiempo se marca solo al terminar el ▶.</li></ol>
+    <ol><li><b>Visión</b> (Metas): hacia dónde vas en años.</li><li><b>Frente</b>: un proyecto (tareas distintas, como THM o CCFA; máximo 2 activos) o un hábito (lo mismo cada día, como leer 20 minutos; no ocupa cupo).</li><li><b>Objetivo</b> del frente: un resultado con inicio y fecha límite. Las semanas salen de esas fechas (en un hábito, los días).</li><li><b>Tareas</b> del frente: lo que haces para cumplir la meta de esta semana.</li><li><b>Principal</b> (Hoy): la tarea que eliges para cada día.</li><li><b>Hábito</b>: mide tu constancia. El de un proyecto se marca solo al terminar una tarea; el que tiene tiempo se marca solo al terminar el ▶.</li></ol>
     <h3>Empezar</h3>
     <p>En Frentes toca <b>Crear frente</b> y elige el tipo. Un proyecto te guía por tareas → objetivo → hábito. Un hábito solo pide el tiempo al día y, si quieres, una meta con fecha.</p>
     <h3>Cada día</h3>
@@ -1305,7 +1319,7 @@ function nightRender(){
   let body = "";
   if (NP.step === 0){
     const items = inbox();
-    body = `<p class="wz-step">Paso 1 de 4</p><h3 style="font-size:19px">Vacía la Bandeja</h3>
+    body = `<p class="wz-step">Paso 1 de 4</p><h3 class="wz-q">Vacía la Bandeja</h3>
       ${items.length ? `<div class="stack">${items.map(t => `<div class="card" style="gap:8px;padding:12px"><b>${esc(t.title)}</b> ${exB(t)}<div style="display:flex;gap:6px;flex-wrap:wrap">
         ${active().map(f => `<button class="btn small" data-act="move" data-id="${t.id}" data-front="${f.id}" data-stay="1">${esc(f.name)}</button>`).join("")}
         ${frozen()[0] ? `<button class="btn small" data-act="move" data-id="${t.id}" data-front="${(frozen().find(f => /alg[uú]n d[ií]a/i.test(f.name)) || frozen()[0]).id}" data-stay="1">Congelar</button>` : ""}
@@ -1314,20 +1328,20 @@ function nightRender(){
       : '<p class="empty">Bandeja vacía. Sigue al paso 2.</p>'}
       <button class="btn primary block" data-act="np-next">${items.length ? "Seguir con lo que queda" : "Siguiente"}</button>`;
   } else if (NP.step === 1){
-    body = `<p class="wz-step">Paso 2 de 4 · ${fmt(tm,{weekday:"long", day:"numeric"})}</p><h3 style="font-size:19px">Elige la principal de mañana</h3>
+    body = `<p class="wz-step">Paso 2 de 4 · ${fmt(tm,{weekday:"long", day:"numeric"})}</p><h3 class="wz-q">Elige la principal de mañana</h3>
       <p class="muted" style="font-size:13.5px">1) ¿Tiene consecuencia real? 2) ¿Te acerca a tu objetivo? 3) ¿Hace las demás más fáciles?</p>
       ${cand || '<p class="muted">No hay tareas en tus frentes activos.</p><button class="btn" data-act="nav" data-v="frentes">Ir a Frentes a escribir tareas</button>'}
       <div style="display:flex;gap:8px"><button class="btn" data-act="np-back">Atrás</button><button class="btn primary" style="flex:1" data-act="np-next" ${NP.p1 ? "" : "disabled"}>Siguiente</button></div>`;
   } else if (NP.step === 2){
-    body = `<p class="wz-step">Paso 3 de 4</p><h3 style="font-size:19px">Extras (opcional, máximo 2)</h3>
+    body = `<p class="wz-step">Paso 3 de 4</p><h3 class="wz-q">Extras (opcional, máximo 2)</h3>
       <p class="muted" style="font-size:13.5px">${NP.p2.length}/2 elegidos. Si solo cumples la principal, el día ya cuenta.</p>
       ${cand}
       <div style="display:flex;gap:8px"><button class="btn" data-act="np-back">Atrás</button><button class="btn primary" style="flex:1" data-act="np-save">Guardar plan</button></div>`;
   } else {
     const c = task(NP.p1), st = settings();
-    body = `<p class="wz-step">Paso 4 de 4</p><h3 style="font-size:19px">Déjala preparada</h3>
+    body = `<p class="wz-step">Paso 4 de 4</p><h3 class="wz-q">Déjala preparada</h3>
       <div class="ticket"><div class="tk-top"><span class="tk-front">Principal de mañana</span></div><h3 class="tk-title">${esc(c ? c.title : "")}</h3></div>
-      <p style="font-size:14.5px">Antes de dormir, deja abierta la pestaña, el archivo o el cuaderno que necesitas. Mañana${st.fixedTime ? ` a las <b>${esc(st.fixedTime)}</b>` : ""} no decides nada: solo ejecutas.</p>
+      <p>Antes de dormir, deja abierta la pestaña, el archivo o el cuaderno que necesitas. Mañana${st.fixedTime ? ` a las <b>${esc(st.fixedTime)}</b>` : ""} no decides nada: solo ejecutas.</p>
       ${st.planBTime ? `<p class="muted" style="font-size:13.5px">Si sales después de las ${esc(st.planBTime)}, solo el mínimo.</p>` : ""}
       <button class="btn primary block" data-act="close">Listo</button>`;
   }
