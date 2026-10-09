@@ -486,6 +486,42 @@ console.log('\nCopia de seguridad');
   await p.goto('file://' + page); await p.waitForSelector('.sec-head'); await p.click('[data-act=settings]');
   ok(await p.locator('[data-act=backup]').count() === 0 && await p.locator('label[for=restore-file]').count() === 1, 'sin descargas se oculta el botón y queda restaurar'); await p.close();
 }
+// ---------- 7. hojas en iPhone ----------
+console.log('\nHojas en iPhone');
+{ // el iPhone da a los campos de hora y fecha un ancho propio que no respeta width:100%; se simula de dos formas:
+  // un ancho mínimo del campo (como el del navegador: sin especificidad) y un contenido interno más ancho que la hoja
+  const IOS = ':where(input[type=time],input[type=date]){min-width:520px} input[type=time]::-webkit-datetime-edit,input[type=date]::-webkit-datetime-edit{min-width:520px}';
+  const fits = p => p.evaluate(() => { const s = document.querySelector('#modal .sheet'), r = s.getBoundingClientRect();
+    return s.scrollWidth <= s.clientWidth && [...s.querySelectorAll('input:not([hidden]),textarea,select,.btn,.opt')].every(x => x.getBoundingClientRect().right <= r.right + .5); });
+  for (const scheme of ['light', 'dark']){
+    const p = await open(scheme, seedGoal({ start:add(TODAY, -3), days:28 })); await p.addStyleTag({ content:IOS });
+    await p.click('[data-act=settings]'); ok(await fits(p), `${scheme}: Ajustes no se sale por la derecha con los campos de hora del iPhone`);
+    await p.screenshot({ path:path.join(out, `ajustes-iphone-${scheme}.png`) }); await p.click('[data-act=close]');
+    await nav(p, 'metas'); await p.click('[data-act=goal-sheet]'); await p.click('[data-act=goal-edit]');
+    ok(await fits(p), `${scheme}: Editar objetivo no se sale con los campos de fecha del iPhone`); await p.click('[data-act=close]');
+    ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
+    const w = await open(scheme); await w.addStyleTag({ content:IOS });
+    await w.click('text=Crear tu primer frente'); await w.fill('#wz-name', 'Nuevo'); await w.click('[data-act=wz-next]'); await w.click('[data-act=wz-next]');
+    ok(await w.locator('#g-start').count() === 1 && await fits(w), `${scheme}: el paso del objetivo en el asistente no se sale`); await w.close();
+  }
+  // con una hoja abierta el fondo no se mueve; al cerrarla vuelve a moverse desde donde estaba
+  const p = await open('light', seedGoal({ start:add(TODAY, -3), days:28 })); await p.addStyleTag({ content:'main{min-height:3000px}' });
+  await p.evaluate(() => window.scrollTo(0, 300)); await p.click('[data-act=settings]');
+  const over = () => p.evaluate(() => getComputedStyle(document.documentElement).overflowY);
+  ok(await over() === 'hidden', 'con Ajustes abierto la página de atrás queda fija');
+  await p.mouse.move(195, 60); await p.mouse.wheel(0, 600); await p.mouse.move(195, 700); await p.mouse.wheel(0, 600); await p.waitForTimeout(150);
+  ok(await p.evaluate(() => window.scrollY) === 300, 'deslizar sobre la hoja o el fondo no mueve lo de atrás');
+  await p.click('[data-act=close]');
+  ok(await over() !== 'hidden' && await p.evaluate(() => window.scrollY) === 300, 'al cerrar, la página sigue donde estaba y se puede mover');
+  await p.mouse.wheel(0, 200); await p.waitForTimeout(150); ok(await p.evaluate(() => window.scrollY) > 300, 'después de cerrar la hoja la página vuelve a desplazarse');
+  ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
+  // el temporizador a pantalla completa también deja quieto el fondo
+  const q = await open('light', { ...base2(), ...readHabit() }); await q.click('[data-act=hfocus]');
+  ok(await q.evaluate(() => getComputedStyle(document.documentElement).overflowY) === 'hidden', 'con el temporizador abierto el fondo queda fijo');
+  await q.click('[data-act=focus-stop]'); await q.click('[data-act=focus-finish]'); await q.waitForTimeout(100);
+  ok(await q.locator('#focus .focus').count() === 0 && await q.evaluate(() => getComputedStyle(document.documentElement).overflowY) !== 'hidden', 'al cerrar el temporizador se libera');
+  ok(!q.errs.length, 'sin errores ' + q.errs.join('|')); await q.close();
+}
 // escritorio
 { const p = await open('light', seedGoal({ start:add(TODAY, -16), days:28, levels:pattern(add(TODAY, -16), add(TODAY, -1)) }), 1280);
   await nav(p, 'metas'); await p.screenshot({ path:path.join(out, 'metas-escritorio.png') }); ok(!p.errs.length, 'escritorio sin errores'); await p.close(); }

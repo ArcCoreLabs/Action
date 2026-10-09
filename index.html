@@ -421,6 +421,12 @@ ul.help{font-size:14px}
 .wz-step{font-size:10.5px}
 .day-line{margin-top:-2px}
 .day-line .dash{min-height:36px;font-size:13px}
+/* ---------- iPhone: nada se sale por los lados y, con una hoja abierta, el fondo se queda quieto ---------- */
+input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;display:block;min-width:0;max-width:100%;text-align:left} /* el iPhone les da un ancho propio que ignora width:100% */
+input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and-time-value{text-align:left;min-height:1.4em}
+.sheet,.stack,label.field{grid-template-columns:minmax(0,1fr)}
+.sheet{overflow-x:hidden;overscroll-behavior:contain}
+html:has(#modal .scrim),html:has(#focus .focus){overflow:hidden}
 </style>
 
 
