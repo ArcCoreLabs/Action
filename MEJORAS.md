@@ -11,13 +11,14 @@ Cada fase termina con la app publicada y usable. No se empieza una fase sin cerr
 | Fase | Qué | Tareas | Se cierra cuando |
 |---|---|---|---|
 | **0 · Base** | Repo con historial, pruebas automáticas y el bosque | Tarea 0 | El bosque está publicado en el artifact |
-| **1 · Lo crítico** | Lo que protege tus datos y quita fricción diaria | Tarea 3 → Tarea 1 → Tarea 2 | Tienes una copia descargada y la app no pide nada dos veces |
+| **1 · Lo crítico** | Lo que protege tus datos y quita fricción diaria | Tarea 7 → Tarea 3 → Tarea 1 → Tarea 2 | Tienes una copia descargada y la app no pide nada dos veces |
 | **2 · Usarla** | 4 semanas de uso real, **sin funciones nuevas** (solo arreglar errores) | — | Pasaron 4 domingos con revisión cerrada |
 | **3 · Según el uso** | Solo lo que el uso real pida, en este orden por defecto | Tarea 5 → Tarea 6 → Tarea 4 | Tú decides, con lo anotado en la fase 2 |
 | **4 · Fuera del artifact** | La versión independiente (sección 3) | — | Fuera de alcance por ahora |
 
 **Por qué este orden**
-- La **Tarea 3** va primero en la fase 1: hoy tus datos viven solo en el artifact y no tienen copia. Se hace antes de cambiar cómo se guardan (Tarea 1).
+- La **Tarea 7** (frentes de hábito) entró primero a la fase 1 porque salió del uso real: armar un hábito como leer exigía crear una tarea cada día.
+- La **Tarea 3** va después: hoy tus datos viven solo en el artifact y no tienen copia. Se hace antes de cambiar cómo se guardan (Tarea 1).
 - En la **fase 2**, lo que estorbe se anota en Semana → «¿Qué voy a cambiar?» empezando con `App:` (se guarda solo, cualquier día). Al final de la fase se leen esas 4 revisiones en Anteriores y de ahí sale la fase 3.
 - La **Tarea 5** se reduce: el bosque ya muestra cada día de cada objetivo. Queda el porcentaje de días ganados del mes y la mejor racha de cada hábito.
 - La **Tarea 4** (IA) va al final porque es la más grande y la única que depende de una capability (`sample`) cuya forma exacta hay que verificar antes de escribir código.
@@ -37,11 +38,11 @@ Cada fase termina con la app publicada y usable. No se empieza una fase sin cerr
 ### Filosofía del producto (no romperla)
 
 1. **Una sola tarea Principal por día** y **máximo 2 Extras**. Si cumples la Principal, el día está ganado.
-2. **Máximo 2 frentes activos.** El resto va a Congelados.
+2. **Máximo 2 proyectos activos.** El resto va a Congelados. Los frentes de **hábito** (lo mismo cada día, como leer 20 minutos) no ocupan cupo.
 3. **Mínimo innegociable:** en un día malo, cumplir el mínimo mantiene la racha. Regla: *nunca fallar dos veces seguidas*.
 4. **Se decide la noche anterior y de día solo se ejecuta.**
 5. **Interfaz minimalista:** casillas, recuadros punteados con "+" para lo vacío y un botón **"!"** de ayuda en cada apartado (objeto `HELP`). Pocas palabras en pantalla.
-6. **Todo queda ligado al frente:** el asistente "Crear frente" lleva por Frente → Tareas → Objetivo → Hábito. El objetivo y el hábito son opcionales.
+6. **Todo queda ligado al frente:** el asistente "Crear frente" pregunta primero el tipo. Un proyecto lleva por Frente → Tareas → Objetivo → Hábito (objetivo y hábito opcionales). Un hábito lleva por Frente → Tiempo al día → Meta con fecha (opcional).
 7. **Los formularios se comparten:** el asistente y cada módulo usan exactamente el mismo formulario (`goalFields`/`readGoalFields` y `habitFields`/`readHabitFields`). Si agregas un campo, agrégalo ahí y aparecerá en los dos lugares.
 
 ### Cinco secciones (barra inferior)
@@ -50,7 +51,7 @@ Cada fase termina con la app publicada y usable. No se empieza una fase sin cerr
 |---|---|
 | **Hoy** | Fecha · Principal · Extras · Hábitos de hoy · puntos de la semana · Mañana (plan de noche) |
 | **Bandeja** | Captura rápida. Casilla = hecho. "Mover" = enviar a un frente |
-| **Frentes** | Frentes activos (con su objetivo, la meta de esta semana y su hábito) · tareas · Congelados |
+| **Frentes** | Proyectos activos (con su objetivo, la meta de esta semana, su hábito y sus tareas) · Hábitos · Congelados |
 | **Metas** | Visión · Objetivos (barra de progreso, bosque, semanas marcables, plan plegable) |
 | **Semana** | Estadísticas · revisión del domingo (3 preguntas, limpieza, semana de cada objetivo) · revisiones anteriores |
 
@@ -59,7 +60,7 @@ Cada fase termina con la app publicada y usable. No se empieza una fase sin cerr
 Las colecciones viven en la raíz. Se escribe con `put(col, obj)` (reemplazo completo, con una cola por documento) y se borra con `remove(col, id)`. Para leer, hay suscripciones `onSnapshot` que llenan el objeto `S`.
 
 ```
-fronts/{id}   { name, note, status: "active"|"frozen", order, created,
+fronts/{id}   { name, note, status: "active"|"frozen", order, created, kind?: "habit",  // sin kind = proyecto
                 pauses: [{from:"YYYY-MM-DD", to?:"YYYY-MM-DD"}] }   // periodos congelado; el bosque no cuenta fallos ahí
 tasks/{id}    { title, frontId|null, minutes|null, slot: null|"critical"|"secondary",
                 date: "YYYY-MM-DD"|null, done, doneAt, created, archived?,
@@ -68,7 +69,9 @@ goals/{id}    { frontId, title, why, start, deadline, standard, minimum, trigger
                 weekly: [{text, done}],         // largo = goalWeeks(g), sale de las fechas
                 premortem: [{cause, counter}×3], rewardMid, rewardEnd, created }
 habits/{id}   { name, minimum, standard, days: [0-6], frontId|null,
+                minutes?, minMinutes?,                         // tiempo al día y mínimo en minutos; con ellos, minimum/standard = "5 min"/"20 min"
                 log: { "YYYY-MM-DD": "full"|"min"|"auto" }, order, created,
+                time?: { "YYYY-MM-DD": minutos },              // minutos hechos con ▶ ese día
                 daysHist?: [{to:"YYYY-MM-DD", days:[0-6]}] }  // días que tenía antes de cada cambio
 reviews/{lunes YYYY-MM-DD} { done, blocked, change, inbox, frozen, closed }
 meta/settings { vision, fixedTime, planBTime }
@@ -89,8 +92,9 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 - **Render:** `render()` (conserva el foco), `VIEWS.{hoy,bandeja,frentes,metas,semana}`, `taskRow`, `head`, `dash`, `info`.
 - **Modales:** `openModal(fn, live)` (cuando `live=false` no se redibuja con cada cambio y `modal.guard` evita cerrarlo tocando fuera), `sheet()`, `taskSheet`, `pickSheet`, `frontSheet`, `goalForm`, `habitsEdit`, `habitEditOne`, `habitNew`, `habitQuick`, `wizardOpen` (W), `nightOpen`/`nightRender` (NP), `settingsSheet`, `guideSheet`, `helpSheet`.
 - **Eventos:** clics delegados con `data-act` → objeto `A`. Formularios con `data-form` → objeto `FORMS`.
-- **Enfoque:** objeto `F`, `focusOpen`, `renderFocus`, `tick`, `logFocus`.
-- **Bosque:** `forestOn`, `paused`, `forestMap` (nivel por día), `forestDays` (estado por día), `forestGoal`, `forestWilting`, `forestGrow` (texto del aviso), `forestArt`, `forestSvg` (la isla), `forestStats`, `forestBlock`, `forestSeen` (animación), `TREES`, `ART`, `RANK`, `plural`, `daysOn` (días del hábito en una fecha), `keepMiss` (guarda la Principal fallada al moverla). Se calcula en memoria a partir de `tasks`, `habits` y `fronts.pauses`; no tiene colección propia.
+- **Tipos de frente:** `isHabitFront`, `projects` (solo estos cuentan para el máximo de 2); asistente por pasos `FLOW`, `HABIT0`, `wzCur`, `wzLast`, `wzGoalOk`; `goalFields(g, {compact})` (meta corta de los hábitos).
+- **Enfoque:** objeto `F` (`kind` "task" o "habit"), `focusOpen`, `focusHabit` (▶ de un hábito), `habitDone` (pantalla final), `renderFocus`, `tick`, `logFocus`, `habitTime` (guarda los minutos y marca el hábito).
+- **Bosque:** `forestOn`, `paused`, `forestMap` (nivel por día), `forestDays` (estado por día), `forestGoal`, `forestWilting`, `forestGrow` / `forestGrowMsg` (texto del aviso), `forestArt`, `forestSvg` (la isla), `forestStats`, `forestBlock`, `forestSeen` (animación), `TREES`, `ART`, `RANK`, `plural`, `daysOn` (días del hábito en una fecha), `keepMiss` (guarda la Principal fallada al moverla). Se calcula en memoria a partir de `tasks`, `habits` y `fronts.pauses`; no tiene colección propia.
 
 ### Reglas al editar
 
@@ -136,6 +140,24 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 - **Avisos al marcar:** primer avance del día: "Brotó una planta en tu bosque." (mínimo), "Creció un árbol en tu bosque." (tarea o hábito) o "Creció un árbol con fruto en tu bosque." (Principal). Si ya había brote: "El brote ya es un árbol.". Si ya había algo y terminas la Principal: "Tu árbol dio fruto.". Si había un árbol marchito por salvar, se agrega "Salvaste el que se marchitaba.". Lo que crece hoy se anima una vez al abrir Metas.
 - **Guía:** sección "Tu bosque".
 
+### Tarea 7: Frentes de hábito con tiempo *(fase 1 · hecha, falta publicar)*
+
+**Problema:** un hábito como "leer Dune" obligaba a crear la tarea "Leer" cada día para poder marcarlo. Registrar páginas también es fricción.
+
+**Hecho:**
+- **Dos tipos de frente** en el primer paso del asistente: **Proyecto** (tareas distintas, máximo 2 activos) o **Hábito** (lo mismo cada día; no ocupa cupo).
+- **El hábito pide solo el tiempo:** Tiempo al día (5 a 90 min, o "Sin tiempo fijo"), Mínimo en minutos y días (todos por defecto). Su meta con fecha es opcional y corta: qué + fechas (3 semanas desde hoy por defecto), lo demás plegado en "Más detalles".
+- **En Hoy → Hábitos**, un hábito con tiempo muestra **▶**. Al tocarlo, el temporizador arranca solo con lo que falta de hoy.
+  - Al terminar el tiempo se marca solo (`full`) y el bosque crece.
+  - Si paras antes y pasaste el mínimo, queda en `min` ("Mínimo cumplido. La racha sigue viva.").
+  - Si paras antes del mínimo, guarda los minutos y lo dice ("Llevas 2 de 20 min").
+  - La casilla y "Solo mínimo" siguen sirviendo para cuando no usas el temporizador.
+- **Frentes** muestra los hábitos en su propia sección, sin lista de tareas (las que ya tuviera se ven, para no perderlas). La hoja del frente permite **Convertir en hábito** o **Convertir en proyecto**.
+- Cualquier hábito, también el de un proyecto, puede tener tiempo y ▶.
+- "Crear hábito" (en Hoy y en Editar hábitos) abre el asistente en tipo Hábito.
+
+**Listo cuando:** se puede crear "Leer Dune · 20 min" con 2 proyectos activos, cumplirlo desde Hoy solo con ▶ y ver crecer su bosque, sin escribir tareas ni números. Cubierto por `node tests/run.mjs` (sección "Frentes de hábito").
+
 ### Tarea 1: Un solo mínimo y un solo estándar *(alta)*
 
 **Problema:** el objetivo y el hábito tienen cada uno su propio "Mínimo" y "Estándar". El usuario puede terminar escribiendo dos mínimos distintos para el mismo frente.
@@ -147,6 +169,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 - En `VIEWS.metas` (Plan), mostrar los valores del hábito cuando exista.
 
 - **Bosque:** el brote sale solo del `log` "min" de un hábito. Si el frente no tiene hábito, el mínimo del objetivo no se puede marcar y el aviso de Hoy pide terminar la Principal.
+- **Ya resuelto por la Tarea 7:** en los frentes de hábito la meta no pide mínimo ni estándar, y en los hábitos con tiempo ambos salen de los minutos. Falta lo mismo para los proyectos.
 
 **Listo cuando:** en ningún flujo se piden dos veces el mínimo y el estándar del mismo frente, los datos antiguos siguen mostrándose bien y `node tests/run.mjs` sigue pasando los casos del bosque.
 

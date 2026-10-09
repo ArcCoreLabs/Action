@@ -193,6 +193,110 @@ for (const scheme of ['light', 'dark']){
     await nav(p, 'metas'); ok(await p.locator('.forest .today').count() === 1, `${scheme}: en objetivos de más de un año se ve el día de hoy`);
     ok(!p.errs.length, `${scheme}: sin errores en el objetivo largo`); await p.close(); }
 }
+// ---------- 5. frentes de hábito con tiempo ----------
+console.log('\nFrentes de hábito');
+const at = mins => new Date(Date.parse(NOW) + mins * 60000);
+const base2 = () => ({ 'fronts/p1':{ name:'CCFA', status:'active', order:1, created:1 }, 'fronts/p2':{ name:'THM', status:'active', order:2, created:2 }, 'meta/settings':{}, 'meta/focus':{ days:{} } });
+const readHabit = (name = 'Leer') => ({ 'fronts/h1':{ name, status:'active', kind:'habit', order:3, created:3 },
+  'habits/hb':{ name, minutes:20, minMinutes:5, minimum:'5 min', standard:'20 min', days:[0,1,2,3,4,5,6], frontId:'h1', log:{}, order:1, created:TODAY } });
+for (const scheme of ['light', 'dark']){
+  const p = await open(scheme, base2());
+  await nav(p, 'frentes');
+  ok((await p.locator('.page-head .count').textContent()) === '2/2', `${scheme}: 2 proyectos activos`);
+  await p.click('[data-act=front-new][data-kind=habit]');
+  ok(await p.locator('.opt.sel[data-v=habit]').count() === 1, `${scheme}: "Nuevo hábito" abre el asistente en tipo Hábito`);
+  await p.screenshot({ path:path.join(out, `asistente-tipo-${scheme}.png`) });
+  await p.fill('#wz-name', 'Leer Dune'); await p.click('[data-act=wz-next]');
+  ok(await p.locator('#h-t-w').inputValue() === '20' && await p.locator('#h-mm-w').isVisible() && !(await p.locator('#h-m-w').isVisible()), `${scheme}: propone 20 min con mínimo en minutos`);
+  await p.screenshot({ path:path.join(out, `asistente-tiempo-${scheme}.png`) });
+  await p.click('[data-act=wz-next]');
+  ok(await p.locator('#g-standard').count() === 0 && await p.locator('#g-title').isVisible(), `${scheme}: la meta del hábito es corta (sin mínimo ni estándar)`);
+  await p.fill('#g-title', 'Terminar Dune');
+  await p.screenshot({ path:path.join(out, `asistente-meta-${scheme}.png`) });
+  await p.click('[data-act=wz-create]'); await p.waitForTimeout(120);
+  let s = await store(p); const hf = s.fronts.find(f => f.name === 'Leer Dune'), hh = s.habits[0], gg = s.goals[0];
+  ok(hf && hf.kind === 'habit' && hf.status === 'active', `${scheme}: el hábito queda activo aunque haya 2 proyectos`);
+  ok(hh && hh.frontId === hf.id && hh.minutes === 20 && hh.minMinutes === 5 && hh.minimum === '5 min' && hh.days.length === 7 && hh.name === 'Leer Dune', `${scheme}: hábito de 20 min, mínimo 5, todos los días`);
+  ok(gg && gg.frontId === hf.id && gg.start === TODAY && gg.deadline === add(TODAY, 20), `${scheme}: meta de 3 semanas desde hoy`);
+  ok(!s.tasks.length, `${scheme}: no crea tareas`);
+  const row = () => p.locator('#view .trow').filter({ hasText:'Leer Dune' });
+  ok(await p.locator('[data-act=hfocus]').count() === 1 && /20 min · mínimo 5 min/.test(await row().textContent()), `${scheme}: queda en Hoy con ▶ y "20 min · mínimo 5 min"`);
+  ok(await noScroll(p) === 390, `${scheme}: la fila con ▶ cabe a 390 px`);
+  await p.screenshot({ path:path.join(out, `hoy-habito-${scheme}.png`) });
+  // ▶ arranca de una; parar a los 6 min cuenta como mínimo
+  await p.click('[data-act=hfocus]');
+  ok((await p.locator('[data-act=focus-toggle]').textContent()) === 'Pausar', `${scheme}: ▶ arranca el temporizador de una`);
+  await p.screenshot({ path:path.join(out, `habito-temporizador-${scheme}.png`) });
+  await p.clock.setFixedTime(at(6)); await p.waitForTimeout(400);
+  await p.click('[data-act=focus-stop]');
+  let txt = await p.locator('.focus').textContent();
+  ok(/Mínimo cumplido/.test(txt) && /La racha sigue viva/.test(txt) && /Brotó/.test(txt), `${scheme}: parar después del mínimo cuenta como mínimo`);
+  await p.click('[data-act=focus-finish]'); await p.waitForTimeout(120);
+  s = await store(p); ok(s.habits[0].log[TODAY] === 'min' && s.habits[0].time[TODAY] === 6, `${scheme}: guarda 6 min y el mínimo`);
+  ok(/6 de 20 min/.test(await row().textContent()), `${scheme}: Hoy muestra "6 de 20 min"`);
+  // seguir: el ▶ continúa con lo que falta y al terminar se marca solo
+  await p.click('[data-act=hfocus]');
+  ok((await p.locator('#ringTime').textContent()) === '14:00', `${scheme}: sigue con lo que falta (14 min)`);
+  await p.clock.setFixedTime(at(20)); await p.waitForTimeout(600);
+  txt = await p.locator('.focus').textContent();
+  ok(/Hábito cumplido/.test(txt) && /árbol/.test(txt), `${scheme}: al terminar el tiempo se marca solo y crece el árbol`);
+  await p.screenshot({ path:path.join(out, `habito-cumplido-${scheme}.png`) });
+  await p.click('[data-act=focus-finish]'); await p.waitForTimeout(120);
+  s = await store(p); ok(s.habits[0].log[TODAY] === 'full' && s.habits[0].time[TODAY] === 20, `${scheme}: queda cumplido con 20 min`);
+  ok(await p.locator('[data-act=hfocus]').count() === 0 && await row().locator('.check.on').count() === 1, `${scheme}: la casilla queda marcada y el ▶ se va`);
+  // Frentes y Metas
+  await nav(p, 'frentes');
+  const card = p.locator('.front').filter({ hasText:'Leer Dune' });
+  ok(/Hábito · todos los días · 20 min · mínimo 5 min/.test(await card.textContent()) && await card.locator('.add-line').count() === 0, `${scheme}: Frentes lo muestra en Hábitos, sin pedir tareas`);
+  ok((await p.locator('.page-head .count').textContent()) === '2/2', `${scheme}: no ocupa cupo de proyecto`);
+  await p.screenshot({ path:path.join(out, `frentes-habitos-${scheme}.png`), fullPage:true });
+  await nav(p, 'metas'); ok(/1 árbol/.test(await p.locator('.forest-count').first().textContent()), `${scheme}: el bosque de la meta crece`);
+  ok(!p.errs.length && await noScroll(p) === 390, `${scheme}: sin errores ni scroll ${p.errs.join('|')}`);
+  await p.close();
+}
+{ // por debajo del mínimo no marca nada, pero guarda los minutos
+  const p = await open('light', { ...base2(), ...readHabit() });
+  await p.click('[data-act=hfocus]'); await p.clock.setFixedTime(at(2)); await p.waitForTimeout(400); await p.click('[data-act=focus-stop]');
+  const txt = await p.locator('.focus').textContent();
+  ok(/Llevas 2 de 20 min/.test(txt) && /El mínimo es 5 min/.test(txt), 'parar antes del mínimo no marca y lo dice claro');
+  await p.click('[data-act=focus-finish]'); await p.waitForTimeout(120);
+  const h = (await store(p)).habits[0]; ok(!h.log[TODAY] && h.time[TODAY] === 2, 'guarda 2 min sin marcar el hábito');
+  // marcar a mano también sirve (leíste sin temporizador)
+  await p.click('[data-act=hcheck]'); await p.waitForTimeout(80); ok((await store(p)).habits[0].log[TODAY] === 'full', 'la casilla lo marca a mano');
+  // editar: quitar el tiempo muestra los campos de texto
+  await p.click('[data-act=habits-edit]'); await p.selectOption('#h-t-hb', '');
+  ok(await p.locator('#h-m-hb').isVisible() && !(await p.locator('#h-mm-hb').isVisible()), 'sin tiempo fijo vuelven el mínimo y el estándar en texto');
+  await p.selectOption('#h-t-hb', '30'); ok(await p.locator('#h-mm-hb').isVisible(), 'con tiempo vuelve el mínimo en minutos');
+  await p.click('[data-form=habit] button[type=submit]'); await p.waitForTimeout(80);
+  const h2 = (await store(p)).habits[0]; ok(h2.minutes === 30 && h2.standard === '30 min', 'cambiar el tiempo a 30 min');
+  ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
+}
+{ // convertir un proyecto en hábito
+  const seed = { 'fronts/d1':{ name:'Lectura de Dune', status:'active', order:1, created:1 }, 'tasks/t1':{ title:'Leer', frontId:'d1', minutes:45, slot:null, date:null, done:false, created:1 }, 'meta/settings':{}, 'meta/focus':{ days:{} } };
+  const p = await open('light', seed); await nav(p, 'frentes');
+  await p.click('[data-act=front-sheet][data-id=d1]'); await p.click('[data-act=front-kind][data-v=habit]');
+  ok(await p.locator('[data-form=habit-quick]').count() === 1 && await p.locator('#h-t-q').inputValue() === '20', 'al convertir pide el tiempo del hábito');
+  await p.click('[data-form=habit-quick] button[type=submit]'); await p.waitForTimeout(100);
+  const s = await store(p); ok(s.fronts[0].kind === 'habit' && s.habits[0].frontId === 'd1' && s.habits[0].minutes === 20 && s.habits[0].name === 'Lectura de Dune', 'queda como hábito de 20 min');
+  ok((await p.locator('.page-head .count').textContent()) === '0/2', 'deja libre el cupo de proyecto');
+  ok(/Leer/.test(await p.locator('.front').filter({ hasText:'Lectura de Dune' }).textContent()), 'la tarea que ya tenía no se pierde');
+  await nav(p, 'hoy'); ok(await p.locator('[data-act=hfocus]').count() === 1, 'aparece en Hoy con ▶');
+  ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
+}
+{ // "+ Objetivo" en un hábito abre la meta corta y queda ligada a ese hábito
+  const p = await open('light', { ...base2(), ...readHabit() }); await nav(p, 'frentes');
+  await p.click('.front:has-text("Leer") [data-act=goal-new]');
+  ok(await p.locator('#g-standard').count() === 0 && await p.locator('details summary').filter({ hasText:'Más detalles' }).count() === 1, 'la meta de un hábito usa el formulario corto');
+  await p.fill('#g-title', 'Terminar el libro'); await p.click('[data-form=goal] button[type=submit]'); await p.waitForTimeout(80);
+  const g = (await store(p)).goals[0]; ok(g && g.frontId === 'h1' && g.start === TODAY, 'la meta queda ligada al hábito y empieza hoy');
+  ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
+}
+{ // activar un hábito congelado no choca con el máximo de 2 proyectos
+  const seed = { ...base2(), ...readHabit() }; seed['fronts/h1'] = { ...seed['fronts/h1'], status:'frozen', pauses:[{ from:add(TODAY, -3) }] };
+  const p = await open('light', seed); await nav(p, 'frentes'); await p.click('.trow [data-act=front-activate]'); await p.waitForTimeout(80);
+  ok((await store(p)).fronts.find(f => f.id === 'h1').status === 'active', 'un hábito congelado se activa aunque haya 2 proyectos');
+  await p.close();
+}
 // escritorio
 { const p = await open('light', seedGoal({ start:add(TODAY, -16), days:28, levels:pattern(add(TODAY, -16), add(TODAY, -1)) }), 1280);
   await nav(p, 'metas'); await p.screenshot({ path:path.join(out, 'metas-escritorio.png') }); ok(!p.errs.length, 'escritorio sin errores'); await p.close(); }
