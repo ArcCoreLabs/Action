@@ -100,6 +100,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 
 - **Mantén un solo archivo autocontenido.** Solo se permiten CDNs de la lista blanca de Artifacts (las fuentes vienen de Google Fonts).
 - **Colores siempre con tokens CSS de `:root`**, con sus variantes oscuras ya definidas.
+- **Tamaños del estilo compacto (bloque `v4` del CSS):** casillas redondas de 18 px como los puntos de la semana (con área táctil ampliada), títulos de fila 14 px, detalles 11,5 px, títulos de sección 14 px, filas de 42 px. Lo nuevo usa esos mismos tamaños.
 - **Escrituras:** una por documento a la vez (usa `put`). Nunca escribas desde un render ni desde un callback de snapshot.
 - **Formularios con texto libre:** usa `openModal(fn, false)` y campos `textarea.auto` para textos largos.
 - **Toda función nueva necesita su "!":** actualiza `HELP` y `guideSheet()`.
@@ -235,6 +236,7 @@ Esto no se hace en el artifact. Queda como referencia para una versión independ
 ## 4. Cómo probar cada cambio
 
 > **Atajo:** `node tests/run.mjs` hace los pasos 2 y 3 (flujos base y casos del bosque, en claro y oscuro) y deja las capturas en `tests/out/`. Cada tarea nueva agrega sus casos a ese archivo.
+> **Capturas:** `node tests/vistas.mjs` toma las 5 vistas y una hoja con datos realistas, en claro y oscuro, en `tests/out/vistas/`. Sirve para la revisión visual del paso 4.
 
 1. **Revisión de sintaxis:** extrae el `<script>` y corre `node --check`.
 2. **Prueba con almacenamiento simulado:** crea una página de prueba que inyecte, **antes** del HTML de la app, un `window.claude` falso:

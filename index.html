@@ -336,6 +336,78 @@ ul.help li::marker{color:var(--faint)}
 /* ---------- hábitos con tiempo ---------- */
 .hf{display:grid;gap:14px}
 .hf[data-timed="1"] .hf-free,.hf[data-timed="0"] .hf-time{display:none}
+/* ---------- v4: compacto. Todo habla como los puntos de la semana: círculos pequeños, letra corta, el mismo ritmo en cada vista ---------- */
+body{font-size:14px}
+.block{margin-top:28px}
+.page-head{margin:4px 0 18px}
+.sec-head{margin-bottom:8px;gap:8px}
+.sec-head h1{font-size:22px}
+.sec-head h2{font-size:14px}
+.sec-head h3{font-size:13px}
+.sec-head .count{font-size:12px}
+.date-title{font-size:20px}
+.info{width:18px;height:18px;border-width:1.25px;font-size:10.5px}
+/* casilla = punto: 18 px, redonda, igual en todas partes; el área que toca el dedo sigue siendo grande */
+.check,.check.big{position:relative;width:18px;height:18px;border-radius:50%;border:1.5px solid var(--faint)}
+.check::after{content:"";position:absolute;inset:-12px -8px -12px -12px}
+.check svg,.check.big svg{width:10px;height:10px}
+.check.half{background:transparent;border-color:var(--ok)}
+.check.half svg{opacity:0}
+input.box{width:18px;height:18px;border-radius:50%;border-width:1.5px}
+input.box:checked::after{width:7px;height:4px;border-left-width:1.8px;border-bottom-width:1.8px}
+.trow{min-height:42px;padding:7px 0;gap:10px}
+.ttitle{font-size:14px}
+.tmeta{font-size:11.5px}
+.main-task{padding:12px 12px 12px 14px;gap:10px;border-radius:14px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.main-task .mt-title{font-size:15.5px;line-height:1.3}
+.main-task .tmain{gap:2px}
+.play{width:30px;height:30px}
+.play svg{width:11px;height:11px;margin-left:1px}
+.play.small{width:26px;height:26px}
+.play.small svg{width:10px;height:10px}
+.more{width:26px;height:26px}
+.more svg{width:15px;height:15px}
+.dash{min-height:42px;padding:0 14px;border-radius:12px;border-width:1.25px;font-size:13.5px}
+.dash span{width:18px;font-size:16px}
+.chip-btn{min-height:24px;padding:0 9px;font-size:11px}
+.notice{font-size:12.5px}
+.notice .text-btn{font-size:12px}
+.dots{margin-top:10px}
+.add-line{gap:10px;padding:6px 0}
+.add-line .plus{width:18px;font-size:15px}
+.add-line input,.add-line select{min-height:32px}
+.text-btn,.link{font-size:12.5px}
+.empty{font-size:13px;padding:10px 0}
+.front{margin-bottom:24px}
+.front-head h2{font-size:16px}
+.front-goal{font-size:13px;padding:8px 10px}
+.fg-week{font-size:12px}
+.goal{gap:10px}
+.goal h2{font-size:17px}
+.bar-legend{font-size:11.5px}
+.vision{font-size:15px}
+.stats{gap:22px}
+.stat b{font-size:20px}
+.stat span{font-size:11.5px}
+.qa{gap:16px}
+label.field{font-size:13px}
+label.field .hint{font-size:11.5px}
+.kv{font-size:13.5px}
+.kv dt{font-size:11px}
+details>summary{font-size:13px}
+.btn{min-height:38px;padding:0 14px;border-radius:10px;font-size:13.5px}
+.btn.small{min-height:30px;font-size:12.5px}
+.capture input,.capture .btn{min-height:44px}
+.capture .btn{width:44px;font-size:20px}
+.sheet{gap:10px}
+.sheet-head h2{font-size:17px}
+.opt{padding:10px 12px;border-radius:10px;font-size:13.5px}
+.opt small{font-size:11.5px}
+.group-label{font-size:10.5px}
+.wz-q{font-size:17px}
+.day-tog span{width:32px;height:32px;font-size:12px}
+ul.help{font-size:14px}
+.toast{padding:9px 14px;font-size:13px}
 </style>
 
 
@@ -797,13 +869,14 @@ VIEWS.metas = function(){
     const elapsed = g.start && g.deadline ? Math.max(0, Math.min(100, diffDays(g.start, today()) / Math.max(1, diffDays(g.start, g.deadline)) * 100)) : 0;
     const pm = (g.premortem || []).filter(p => p && (p.cause || p.counter));
     const items = Array.from({length:N}, (_, i) => ({...(weekly[i] || {}), i}));
+    const hk = isHabitFront(f), fst = hk && forestOn(g) ? forestStats(g, forestDays(g, true)) : null, hit = fst ? fst.trees + fst.sprouts : 0; // un hábito avanza por días, no por semanas
     return `<section class="goal">
       <div class="front-head"><div class="tmain"><span class="tmeta">${esc(f ? f.name : "Sin frente")}</span><h2>${esc(g.title || "Objetivo sin nombre")}</h2></div>
         <button class="more" data-act="goal-sheet" data-id="${g.id}" aria-label="Opciones">${ICON.more}</button></div>
-      <div><div class="bar"><span style="width:${doneN/N*100}%"></span><i style="left:${elapsed}%"></i></div>
-        <p class="bar-legend">${join([g.start && today() < g.start ? `Empieza el ${fmtShort(g.start)}` : g.deadline && today() > g.deadline ? (doneN === N ? "Cumplido" : "Plazo vencido") : `Semana ${wk} de ${N}`, `${doneN}/${N} semanas cumplidas`, g.deadline && today() <= g.deadline ? `faltan ${diffDays(today(), g.deadline)} días` : ""])}</p></div>
+      <div><div class="bar"><span style="width:${fst ? hit / Math.max(1, fst.total) * 100 : doneN/N*100}%"></span><i style="left:${elapsed}%"></i></div>
+        <p class="bar-legend">${join([g.start && today() < g.start ? `Empieza el ${fmtShort(g.start)}` : g.deadline && today() > g.deadline ? (hk ? "Terminó" : doneN === N ? "Cumplido" : "Plazo vencido") : `Semana ${wk} de ${N}`, fst ? `${hit} de ${plural(fst.total, "día", "días")} cumplidos` : `${doneN}/${N} semanas cumplidas`, g.deadline && today() <= g.deadline ? `faltan ${diffDays(today(), g.deadline)} días` : ""])}</p></div>
       ${forestOn(g) ? forestBlock(g) : ""}
-      ${items.length ? `<div class="list">${items.map(w => `<div class="trow ${w.done ? "done" : ""} ${w.i + 1 === wk ? "cur" : ""}">
+      ${items.length && !hk ? `<div class="list">${items.map(w => `<div class="trow ${w.done ? "done" : ""} ${w.i + 1 === wk ? "cur" : ""}">
         <button class="check ${w.done ? "on" : ""}" data-act="goal-week" data-id="${g.id}" data-i="${w.i}" aria-label="Marcar semana ${w.i + 1}">${ICON.check}</button>
         <div class="tmain"><span class="ttitle">${w.text ? esc(w.text) : '<span class="muted">Sin definir</span>'}</span><span class="tmeta">Semana ${w.i + 1}${w.i + 1 === wk ? " · esta semana" : ""}</span></div></div>`).join("")}</div>` : ""}
       ${(g.minimum || g.trigger || g.standard || g.why || pm.length) ? `<details><summary>Plan</summary><div class="d-body kvs">
@@ -834,7 +907,7 @@ VIEWS.semana = function(){
   const fmin = days.reduce((a, x) => a + ((S.focus.days || {})[x] || 0), 0);
   const act = active();
   const past = S.reviews.filter(x => x.id < mon).sort((a,b) => b.id.localeCompare(a.id));
-  const field = (id, label, val) => `<label class="field" for="${id}">${label}<textarea id="${id}" data-review="${id.slice(3)}">${esc(val || "")}</textarea></label>`;
+  const field = (id, label, val) => `<label class="field" for="${id}">${label}<textarea class="auto" rows="1" id="${id}" data-review="${id.slice(3)}">${esc(val || "")}</textarea></label>`;
   return `
   <div class="page-head">${head("Semana", "semana", `<span class="count">${fmtShort(mon)} – ${fmtShort(sun)}</span>`, "h1")}</div>
   <div class="stats">
@@ -851,7 +924,7 @@ VIEWS.semana = function(){
       <label class="trow" style="cursor:pointer"><input type="checkbox" class="box" id="rv-inbox" data-review-check="inbox" ${r.inbox ? "checked" : ""}><span class="ttitle">Bandeja vacía</span></label>
       <label class="trow" style="cursor:pointer"><input type="checkbox" class="box" id="rv-frozen" data-review-check="frozen" ${r.frozen ? "checked" : ""}><span class="ttitle">Congelados revisados</span></label>
     </div>
-    ${(() => { const gs = act.map(f => goalFor(f.id)).filter(Boolean); if (!gs.length) return "";
+    ${(() => { const gs = act.filter(f => !isHabitFront(f)).map(f => goalFor(f.id)).filter(Boolean); if (!gs.length) return "";
       return `<div class="qa" style="gap:14px"><span class="field-label">Tus objetivos</span>${gs.map(g => { const wk = goalWeek(g), N = goalWeeks(g), w = g.weekly || [], cur = w[wk-1] || {}, nx = w[wk] || {};
         return `<div class="stack" style="gap:8px"><span class="tmeta">${esc(g.title)}</span>
           ${wk === 0 ? "" : `<div class="trow" style="border-top:0;padding:0;min-height:44px"><button class="check ${cur.done ? "on" : ""}" data-act="goal-week" data-id="${g.id}" data-i="${wk-1}" aria-label="Cumplí la semana">${ICON.check}</button><div class="tmain"><span class="ttitle">Semana ${wk}: ${cur.text ? esc(cur.text) : "sin definir"}</span><span class="tmeta">Márcala si la cumpliste</span></div></div>`}
