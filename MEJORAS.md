@@ -18,7 +18,7 @@ Cada fase termina con la app publicada y usable. No se empieza una fase sin cerr
 
 **Por qué este orden**
 - La **Tarea 3** va primero en la fase 1: hoy tus datos viven solo en el artifact y no tienen copia. Se hace antes de cambiar cómo se guardan (Tarea 1).
-- En la **fase 2**, todo lo que estorbe se anota en la Bandeja empezando con `App:`. Al final de la fase se revisa esa lista y de ahí sale la fase 3.
+- En la **fase 2**, lo que estorbe se anota en Semana → «¿Qué voy a cambiar?» empezando con `App:` (se guarda solo, cualquier día). Al final de la fase se leen esas 4 revisiones en Anteriores y de ahí sale la fase 3.
 - La **Tarea 5** se reduce: el bosque ya muestra cada día de cada objetivo. Queda el porcentaje de días ganados del mes y la mejor racha de cada hábito.
 - La **Tarea 4** (IA) va al final porque es la más grande y la única que depende de una capability (`sample`) cuya forma exacta hay que verificar antes de escribir código.
 - **Capabilities:** cada publicación que las declare debe repetir **todas** (la regla completa de `db`, más `downloads` desde la Tarea 3 y más `sample` desde la Tarea 4). Si se omite una, se pierde.
@@ -51,7 +51,7 @@ Cada fase termina con la app publicada y usable. No se empieza una fase sin cerr
 | **Hoy** | Fecha · Principal · Extras · Hábitos de hoy · puntos de la semana · Mañana (plan de noche) |
 | **Bandeja** | Captura rápida. Casilla = hecho. "Mover" = enviar a un frente |
 | **Frentes** | Frentes activos (con su objetivo, la meta de esta semana y su hábito) · tareas · Congelados |
-| **Metas** | Visión · Objetivos (barra de progreso, semanas marcables, plan plegable) |
+| **Metas** | Visión · Objetivos (barra de progreso, bosque, semanas marcables, plan plegable) |
 | **Semana** | Estadísticas · revisión del domingo (3 preguntas, limpieza, semana de cada objetivo) · revisiones anteriores |
 
 ### Modelo de datos (capability `db`)
@@ -62,12 +62,14 @@ Las colecciones viven en la raíz. Se escribe con `put(col, obj)` (reemplazo com
 fronts/{id}   { name, note, status: "active"|"frozen", order, created,
                 pauses: [{from:"YYYY-MM-DD", to?:"YYYY-MM-DD"}] }   // periodos congelado; el bosque no cuenta fallos ahí
 tasks/{id}    { title, frontId|null, minutes|null, slot: null|"critical"|"secondary",
-                date: "YYYY-MM-DD"|null, done, doneAt, created, archived? }
+                date: "YYYY-MM-DD"|null, done, doneAt, created, archived?,
+                missed?: ["YYYY-MM-DD"] }                      // días en que fue la Principal y no se hizo (se guarda al moverla o quitarla)
 goals/{id}    { frontId, title, why, start, deadline, standard, minimum, trigger,
                 weekly: [{text, done}],         // largo = goalWeeks(g), sale de las fechas
                 premortem: [{cause, counter}×3], rewardMid, rewardEnd, created }
 habits/{id}   { name, minimum, standard, days: [0-6], frontId|null,
-                log: { "YYYY-MM-DD": "full"|"min"|"auto" }, order, created }
+                log: { "YYYY-MM-DD": "full"|"min"|"auto" }, order, created,
+                daysHist?: [{to:"YYYY-MM-DD", days:[0-6]}] }  // días que tenía antes de cada cambio
 reviews/{lunes YYYY-MM-DD} { done, blocked, change, inbox, frozen, closed }
 meta/settings { vision, fixedTime, planBTime }
 meta/focus    { days: { "YYYY-MM-DD": minutos } }
@@ -77,6 +79,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 - Un hábito con `log = "auto"` fue marcado por `syncHabit()` al completar una tarea de su frente.
 - Los hábitos de frentes congelados están en pausa (`habitPaused`).
 - `goalWeek(g)` vale 0 si el objetivo todavía no empieza.
+- `pauses`: el día `from` ya está congelado y el día `to` no. Un frente congelado sin `pauses` (de antes del bosque) cuenta como congelado desde siempre; al activarlo se guarda `{from:"2000-01-01", to:hoy}`.
 
 ### Mapa del código (funciones clave)
 
@@ -87,7 +90,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 - **Modales:** `openModal(fn, live)` (cuando `live=false` no se redibuja con cada cambio y `modal.guard` evita cerrarlo tocando fuera), `sheet()`, `taskSheet`, `pickSheet`, `frontSheet`, `goalForm`, `habitsEdit`, `habitEditOne`, `habitNew`, `habitQuick`, `wizardOpen` (W), `nightOpen`/`nightRender` (NP), `settingsSheet`, `guideSheet`, `helpSheet`.
 - **Eventos:** clics delegados con `data-act` → objeto `A`. Formularios con `data-form` → objeto `FORMS`.
 - **Enfoque:** objeto `F`, `focusOpen`, `renderFocus`, `tick`, `logFocus`.
-- **Bosque:** `forestOn`, `paused`, `forestMap` (nivel por día), `forestDays` (estado por día), `forestGoal`, `forestWilting`, `forestGrow` (texto del aviso), `forestArt`, `forestSvg` (la isla), `forestStats`, `forestBlock`, `TREES`, `ART`. Se calcula en memoria a partir de `tasks`, `habits` y `fronts.pauses`; no tiene colección propia.
+- **Bosque:** `forestOn`, `paused`, `forestMap` (nivel por día), `forestDays` (estado por día), `forestGoal`, `forestWilting`, `forestGrow` (texto del aviso), `forestArt`, `forestSvg` (la isla), `forestStats`, `forestBlock`, `forestSeen` (animación), `TREES`, `ART`, `RANK`, `plural`, `daysOn` (días del hábito en una fecha), `keepMiss` (guarda la Principal fallada al moverla). Se calcula en memoria a partir de `tasks`, `habits` y `fronts.pauses`; no tiene colección propia.
 
 ### Reglas al editar
 
@@ -113,22 +116,24 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 | **Brote** | El hábito del frente quedó en `"min"` |
 | **Árbol** | Se terminó una tarea del frente (`doneAt`) o el hábito quedó en `"full"` o `"auto"` |
 | **Árbol con fruto** (`--accent`) | La Principal de ese día era de este frente y está hecha |
-| **Marchito** | Un día que tocaba (hábito programado o Principal del frente) sin nada |
-| **Salvado** (árbol pequeño) | Era marchito y se cumplió el siguiente día que tocaba |
+| **Marchito** | Un día que tocaba sin nada: el hábito estaba programado (con los días que tenía en esa fecha) o la Principal era de este frente, aunque después la pasaras a otro día o la quitaras |
+| **Salvado** (árbol pequeño) | Era marchito y volviste a avanzar en el frente (cualquier día, tocara o no) antes de otro fallo |
 | **Seco** (tronco caído) | Segundo fallo seguido |
 | **Tierra** | Tercer fallo seguido en adelante |
 | **Pasto** | Un día que no tocaba, o con el frente congelado (`pauses`) |
 | **Hoy** | Rombo `--accent` y una semilla hasta que cumplas |
+| **Por crecer** | Días después de hoy (pasto vacío) |
 
 - Los días que no tocan no cortan ni reinician la cuenta de fallos.
-- Isla cuadrada (lado = raíz del número de días, mínimo 3), un espacio por día (máximo 364), llenada desde el fondo hacia el frente.
+- Isla cuadrada (lado = raíz del número de días, mínimo 3), un espacio por día, llenada desde el fondo hacia el frente. Los objetivos de más de 364 días se ven por bloques de 364: el que contiene hoy.
+- El conteo suma árboles (con y sin fruto), brotes, salvados, marchitos y secos. La tierra no se cuenta.
 - Tres árboles geométricos (pino, redondo, ciprés), con luz desde la izquierda. Tokens: `--grass`, `--grass-2`, `--grass-side`, `--earth`, `--earth-2`, `--tree`, `--tree-2`, `--trunk`, `--wilt`, `--dead`, `--hi`, `--shade`, en claro y oscuro.
 
 **Dónde aparece:**
-- **Metas:** en cada objetivo, entre la barra y las semanas, con su "!" (`HELP.bosque`) y debajo el conteo "11 árboles · 2 brotes · 1 marchito · 11 por crecer".
+- **Metas:** en cada objetivo, entre la barra y las semanas, con su "!" (`HELP.bosque`) y debajo el conteo "11 árboles · 2 brotes · 2 salvados · 1 marchito · 11 por crecer".
 - **Frentes:** en la línea del objetivo, "· 9 árboles".
-- **Hoy:** si hay un árbol marchito por salvar: "Tu árbol de CCFA se está marchitando. Hoy haz al menos el mínimo y lo salvas." (reemplaza el aviso del hábito de ese frente).
-- **Avisos al marcar:** "Creció un árbol en tu bosque.", "Brotó una planta…", "Tu árbol dio fruto.", "Salvaste el que se marchitaba.". El árbol de hoy se anima una vez la próxima vez que abres Metas.
+- **Hoy:** si hay un árbol marchito por salvar y hoy toca algo de ese frente: "Tu árbol de CCFA se está marchitando. Hoy haz al menos el mínimo y lo salvas." (si no hay hábito hoy: "Hoy termina la Principal y lo salvas."). Varios frentes van en un solo aviso. Reemplaza el aviso del hábito de ese frente.
+- **Avisos al marcar:** primer avance del día: "Brotó una planta en tu bosque." (mínimo), "Creció un árbol en tu bosque." (tarea o hábito) o "Creció un árbol con fruto en tu bosque." (Principal). Si ya había brote: "El brote ya es un árbol.". Si ya había algo y terminas la Principal: "Tu árbol dio fruto.". Si había un árbol marchito por salvar, se agrega "Salvaste el que se marchitaba.". Lo que crece hoy se anima una vez al abrir Metas.
 - **Guía:** sección "Tu bosque".
 
 ### Tarea 1: Un solo mínimo y un solo estándar *(alta)*
@@ -141,7 +146,9 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 - En el asistente: el paso Objetivo **no** pide mínimo ni estándar. El paso Hábito los pide. Si el usuario elige "No por ahora", el paso Hábito muestra solo esos dos campos, que se guardan en el objetivo.
 - En `VIEWS.metas` (Plan), mostrar los valores del hábito cuando exista.
 
-**Listo cuando:** en ningún flujo se piden dos veces el mínimo y el estándar del mismo frente, y los datos antiguos siguen mostrándose bien.
+- **Bosque:** el brote sale solo del `log` "min" de un hábito. Si el frente no tiene hábito, el mínimo del objetivo no se puede marcar y el aviso de Hoy pide terminar la Principal.
+
+**Listo cuando:** en ningún flujo se piden dos veces el mínimo y el estándar del mismo frente, los datos antiguos siguen mostrándose bien y `node tests/run.mjs` sigue pasando los casos del bosque.
 
 ### Tarea 2: Tu bloque y el Plan B visibles en Hoy *(alta)*
 
@@ -179,7 +186,7 @@ Usar la capability `sample` (declararla: `sample:{}`). Se llama solo cuando el u
 ### Tarea 5: Historial y rachas *(baja)*
 
 **Hacer:**
-- En Semana, una tarjeta "Este mes": un calendario de puntos con el `dayState` de cada día del mes (los mismos colores que Hoy), el porcentaje de días ganados y la mejor racha de cada hábito.
+- En Semana, una tarjeta "Este mes" con el porcentaje de días ganados del mes (`dayState` = `win`) y la mejor racha de cada hábito. Sin calendario de puntos: el bosque ya muestra cada día.
 - Calcularlo en memoria a partir de `tasks` y `habits` (no hace falta una colección nueva).
 
 ### Tarea 6: Plantillas de objetivo para certificaciones *(baja)*
@@ -244,7 +251,8 @@ Esto no se hace en el artifact. Queda como referencia para una versión independ
 
 ```
 Lee MEJORAS.md completo. Trabajamos sobre index.html (la app "Ejecución").
-Haz solo la Tarea 1. Antes de editar, muéstrame en 5 líneas tu plan.
-Cuando termines: corre las pruebas de la sección 4, muéstrame una captura
-y espera mi OK antes de publicar en el artifact.
+Sigue la sección 0: haz solo la primera tarea de la fase actual que no esté marcada «hecha»
+en su título (si dice «hecha, falta publicar», solo publícala). Antes de editar, muéstrame en 5 líneas tu plan.
+Cuando termines: corre node tests/run.mjs, muéstrame una captura y espera mi OK antes de publicar.
+Al publicar, cambia la etiqueta de la tarea a «(fase N · hecha)».
 ```

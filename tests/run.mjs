@@ -65,7 +65,7 @@ for (const scheme of ['light', 'dark']){
 }
 
 // ---------- 2. bosque con historia ----------
-function seedGoal({ start, days, id = 'g1', title = 'Aprobar la CCFA', levels = {}, habitDays = [0,1,2,3,4,5,6], frontExtra = {} }){
+function seedGoal({ start, days, id = 'g1', title = 'Aprobar la CCFA', levels = {}, habitDays = [0,1,2,3,4,5,6], frontExtra = {}, habit = true, deadline }){
   const seed = { 'fronts/f1':{ name:'CCFA', status:'active', order:1, created:1, ...frontExtra }, 'meta/settings':{}, 'meta/focus':{ days:{} } };
   const log = {}; let n = 0;
   for (const [d, lv] of Object.entries(levels)){
@@ -73,8 +73,8 @@ function seedGoal({ start, days, id = 'g1', title = 'Aprobar la CCFA', levels = 
     if (lv === 2) log[d] = 'full';
     if (lv === 3){ seed[`tasks/t${n}`] = { title:'Estudiar módulo ' + n, frontId:'f1', minutes:45, slot:'critical', date:d, done:true, doneAt:d, created:n }; log[d] = 'auto'; n++; }
   }
-  seed['habits/h1'] = { name:'CCFA', minimum:'15 min', standard:'45 min', days:habitDays, frontId:'f1', log, order:1, created:start };
-  seed[`goals/${id}`] = { frontId:'f1', title, start, deadline:add(start, days - 1), weekly:Array.from({ length:Math.ceil(days / 7) }, (_, i) => ({ text:`Semana ${i + 1} del plan`, done:i < 1 })), premortem:[], created:1 };
+  if (habit) seed['habits/h1'] = { name:'CCFA', minimum:'15 min', standard:'45 min', days:habitDays, frontId:'f1', log, order:1, created:start };
+  seed[`goals/${id}`] = { frontId:'f1', title, start, deadline:deadline || add(start, days - 1), weekly:Array.from({ length:Math.ceil(days / 7) }, (_, i) => ({ text:`Semana ${i + 1} del plan`, done:i < 1 })), premortem:[], created:1 };
   return seed;
 }
 const pattern = (start, upto) => { const L = {}; for (let i = 0, d = start; d <= upto; i++, d = add(d, 1)){ const r = [3,2,2,0,1,3,2,0,2,3,1,2][i % 12]; if (r) L[d] = r; } return L; };
@@ -134,8 +134,8 @@ for (const scheme of ['light', 'dark']){
   await p.click('[data-act=hcheck]'); const tt = await toastText(p);
   ok(/Creció un árbol.*Salvaste el que se marchitaba/.test(tt), `${scheme}: al cumplir hoy se salva ("${tt}")`);
   await nav(p, 'metas'); lb = await p.locator('.forest .forest-count').textContent();
-  ok(!lb.includes('marchito') && lb.includes('5 árboles'), `${scheme}: el marchito pasa a salvado ("${lb}")`);
-  ok(await p.locator('.forest .grow').count() === 0, `${scheme}: primera vista en Metas sin animación`);
+  ok(!lb.includes('marchito') && lb.includes('5 árboles') && lb.includes('1 salvado'), `${scheme}: el marchito pasa a salvado ("${lb}")`);
+  ok(await p.locator('.forest .grow').count() === 1, `${scheme}: el árbol que salvaste se anima al abrir Metas`);
   ok(!p.errs.length && await noScroll(p) === 390, `${scheme}: sin errores ni scroll`); await p.close();
   // fines de semana sin hábito: no castigan
   start = '2026-09-28'; const L = {}; for (let d = start; d < TODAY; d = add(d, 1)){ const w = new Date(d + 'T12:00:00Z').getUTCDay(); if (w >= 1 && w <= 5) L[d] = 2; }
@@ -151,6 +151,47 @@ for (const scheme of ['light', 'dark']){
   await nav(p, 'frentes'); await p.click('[data-act=front-activate]'); await p.waitForTimeout(80);
   const fr = (await store(p)).fronts[0]; ok(fr.status === 'active' && fr.pauses[0].to === TODAY, `${scheme}: activar cierra la pausa`);
   await p.close();
+}
+// ---------- 4. arreglos de la revisión ----------
+console.log('\nArreglos de la revisión');
+for (const scheme of ['light', 'dark']){
+  // frente sin hábito: Principal de ayer sin hacer → "Pasar a hoy" no borra el marchito; al terminarla se salva
+  for (const act of ['carry', 'unassign']){
+    const start = add(TODAY, -6), seed = seedGoal({ start, days:28, habit:false });
+    for (let i = 0; i < 6; i++) seed[`tasks/p${i}`] = { title:'Principal ' + i, frontId:'f1', minutes:45, slot:'critical', date:add(start, i), done:i < 5, doneAt:i < 5 ? add(start, i) : null, created:i };
+    const p = await open(scheme, seed, 360);
+    const btn = await p.evaluate(() => { const b = [...document.querySelectorAll('.notice .text-btn')].map(x => x.getBoundingClientRect().top); return b.length === 2 && Math.abs(b[0] - b[1]) < 2; });
+    ok(btn, `${scheme}: a 360 px "Pasar a hoy" y "Quitar" quedan juntos`);
+    await p.click(`.notice [data-act=${act}]`); await p.waitForTimeout(80); await nav(p, 'metas');
+    let lb = await p.locator('.forest-count').textContent();
+    ok(lb.includes('1 marchito'), `${scheme}: "${act === 'carry' ? 'Pasar a hoy' : 'Quitar'}" no borra el marchito ("${lb}")`);
+    if (act === 'carry'){
+      await nav(p, 'hoy'); const n = await p.locator('.notices').textContent();
+      ok(/Hoy termina la Principal y lo salvas/.test(n), `${scheme}: sin hábito, el aviso pide terminar la Principal`);
+      await p.click('.main-task [data-act=done]'); const tt = await toastText(p);
+      const w = await p.locator('.toast').evaluate(e => e.getBoundingClientRect().width);
+      ok(/Salvaste/.test(tt) && w > 250, `${scheme}: al terminarla se salva y el aviso usa el ancho ("${tt}", ${Math.round(w)} px)`);
+      await nav(p, 'metas'); lb = await p.locator('.forest-count').textContent(); ok(lb.includes('1 salvado') && !lb.includes('marchito'), `${scheme}: queda salvado ("${lb}")`);
+    }
+    ok(!p.errs.length && await noScroll(p) === 360, `${scheme}: sin errores ni scroll a 360 px`); await p.close();
+  }
+  // cambiar los días del hábito no reescribe el pasado
+  { const start = '2026-09-14', L = {}; for (let d = start; d < TODAY; d = add(d, 1)){ const w = new Date(d + 'T12:00:00Z').getUTCDay(); if (w >= 1 && w <= 5) L[d] = 2; }
+    const p = await open(scheme, seedGoal({ start, days:28, levels:L, habitDays:[1,2,3,4,5] }));
+    await p.click('[data-act=habits-edit]'); await p.click('#h-d-h1 label:has(input[value="6"])'); await p.click('#h-d-h1 label:has(input[value="0"])');
+    await p.click('[data-form=habit] button[type=submit]'); await p.waitForTimeout(80); await p.click('[data-act=close]');
+    const h = (await store(p)).habits[0]; ok(h.days.length === 7 && h.daysHist && h.daysHist[0].to === TODAY, `${scheme}: se guarda el historial de días del hábito`);
+    await nav(p, 'metas'); const lb = await p.locator('.forest-count').textContent();
+    ok(!/marchito|seco/.test(lb), `${scheme}: agregar sábado y domingo no marchita las semanas pasadas ("${lb}")`); await p.close(); }
+  // frente congelado con la versión anterior (sin pauses): al activarlo no aparecen fallos
+  { const start = add(TODAY, -12);
+    const p = await open(scheme, seedGoal({ start, days:28, levels:seq(start, [2,2,2,2]), frontExtra:{ status:'frozen' } }));
+    await nav(p, 'frentes'); await p.click('[data-act=front-activate]'); await p.waitForTimeout(80); await nav(p, 'metas');
+    const lb = await p.locator('.forest-count').textContent(); ok(!/marchito|seco/.test(lb), `${scheme}: activar un frente congelado antiguo no llena de fallos ("${lb}")`); await p.close(); }
+  // objetivo de más de 364 días: se ve el bloque que contiene hoy
+  { const start = add(TODAY, -400), p = await open(scheme, seedGoal({ start, days:520, deadline:add(TODAY, 120), levels:seq(add(TODAY, -3), [2,2,2]) }));
+    await nav(p, 'metas'); ok(await p.locator('.forest .today').count() === 1, `${scheme}: en objetivos de más de un año se ve el día de hoy`);
+    ok(!p.errs.length, `${scheme}: sin errores en el objetivo largo`); await p.close(); }
 }
 // escritorio
 { const p = await open('light', seedGoal({ start:add(TODAY, -16), days:28, levels:pattern(add(TODAY, -16), add(TODAY, -1)) }), 1280);
