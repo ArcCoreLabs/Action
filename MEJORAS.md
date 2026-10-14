@@ -12,7 +12,7 @@ Cada fase termina con la app publicada y usable. No se empieza una fase sin cerr
 |---|---|---|---|
 | **0 · Base** ✓ | Repo con historial, pruebas automáticas, el bosque y el estilo compacto | Tarea 0 | Cerrada: publicado en el artifact (versión 11) |
 | **1 · Lo crítico** ✓ | Lo que protege tus datos y quita fricción diaria | Tarea 7 → Tarea 3 → Tarea 1 → Tarea 2 | Cerrada: publicado en el artifact (versión 13). Solo falta que descargues tu primera copia |
-| **2 · Usarla** | 4 semanas de uso real, **sin funciones nuevas** (solo arreglar errores) | Tarea 8 → Tarea 9 → Tarea 10 (adelantadas) | Pasaron 4 domingos con revisión cerrada |
+| **2 · Usarla** | 4 semanas de uso real, **sin funciones nuevas** (solo arreglar errores) | Tarea 8 → Tarea 9 → Tarea 10 (adelantadas, publicadas en la versión 15) | Pasaron 4 domingos con revisión cerrada |
 | **3 · Según el uso** | Solo lo que el uso real pida, en este orden por defecto | Tarea 5 → Tarea 6 → Tarea 4 | Tú decides, con lo anotado en la fase 2 |
 | **4 · Fuera del artifact** | La versión independiente (sección 3) | — | Fuera de alcance por ahora |
 
@@ -210,7 +210,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 - La guía pide descargar los datos cada domingo.
 - Mapa: `COLS`, `backupData`, `backupSave`, `backupParse`, `restorePick`, `restoreSheet`, `restoreRun`, `loaded`, `dl`, `RS`, `restoring`. Pruebas en `tests/run.mjs` (sección "Copia de seguridad"); `tests/mock.js` simula `downloads` (`window.__NODL` lo apaga) y fallos de escritura (`window.__FAILAT`).
 
-### Tarea 8: Congelar y activar sin errores *(fase 2 · hecha, falta publicar)*
+### Tarea 8: Congelar y activar sin errores *(fase 2 · hecha)*
 
 **Problema (revisión del 12 oct, «revisar completo»):** al activar un frente con hábito salía «Llevas 2 días sin cumplir…» y los días congelados se pintaban de rojo; al congelarlo se borraban los fallos que ya tenía. Su Principal de hoy o de mañana se quedaba en Hoy (y al marcarla crecía el bosque de un frente congelado). El bosque congelado marcaba «hoy», un objetivo vencido seguía con «esta semana» y la ayuda de Congelados decía «2 frentes».
 
@@ -224,7 +224,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 
 **Listo cuando:** congelar y activar no cambian el pasado ni dejan tareas del frente en Hoy. Cubierto por `tests/run.mjs` («Congelar y activar»).
 
-### Tarea 9: Ideas congeladas desde la Bandeja *(fase 2 · hecha, falta publicar)*
+### Tarea 9: Ideas congeladas desde la Bandeja *(fase 2 · hecha)*
 
 **Problema:** «las notas que ponga en bandeja debería poder moverlas a congelar… no solo de mis frentes activos sino general». Hoy «Mover a…» solo ofrece frentes, y el «Congelar» de «Planear mañana» manda la nota al primer frente congelado que encuentre (con los datos reales, a eJPT, donde queda escondida como «1 tarea»).
 
@@ -239,7 +239,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 
 **Hecho:** `ideas()`, acciones `idea-freeze` (no se puede sobre una nota hecha) y `idea-back`; `move` quita `someday`. «Congelar · para algún día» va de primero en «Mover a…», encima de los frentes. En «Planear mañana», «Borrar» se arma en el mismo botón («¿Borrar?») sin redibujar, así la hoja no salta. Las fechas de otro año llevan el año (`fmtDay`). El aviso dice dónde quedó: «Congelada. La ves en Frentes → Congelados.». El grupo «Ideas (N)» va plegado al final de Congelados (la idea más reciente arriba, con «Desde el …») y recuerda si lo abriste (`KEEP` + `<details data-keep>`). Cubierto por `tests/run.mjs` («Ideas congeladas»).
 
-### Tarea 10: Frentes congelados sin fechas; las fechas al activar *(fase 2 · hecha, falta publicar)*
+### Tarea 10: Frentes congelados sin fechas; las fechas al activar *(fase 2 · hecha)*
 
 **Problema:** «Debería poder decir si va a estar activa o congelada… que no se cree para esa un bosque ni pida fecha de inicio y fin hasta que la quiera activar». El asistente crea el frente activo si hay cupo y siempre pide fechas; eJPT quedó del 12 oct al 8 nov y su plazo corre aunque esté congelado.
 
