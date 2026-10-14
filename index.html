@@ -528,7 +528,8 @@ const front = id => S.fronts.find(f => f.id === id);
 const task = id => S.tasks.find(t => t.id === id);
 const crit = d => S.tasks.find(t => t.date === d && t.slot === "critical");
 const secs = d => S.tasks.filter(t => t.date === d && t.slot === "secondary").sort((a,b) => (a.created||0) - (b.created||0));
-const inbox = () => S.tasks.filter(t => !t.frontId && !t.done && !t.slot).sort((a,b) => (a.created||0) - (b.created||0));
+const inbox = () => S.tasks.filter(t => !t.frontId && !t.done && !t.slot && !t.someday).sort((a,b) => (a.created||0) - (b.created||0));
+const ideas = () => S.tasks.filter(t => !t.frontId && !t.done && !t.slot && t.someday).sort((a,b) => String(b.someday).localeCompare(String(a.someday)) || (b.created||0) - (a.created||0)); // notas congeladas «para algún día», la más reciente arriba
 const habits = () => S.habits.slice().sort(byOrder);
 const goalWeeks = g => (g && g.start && g.deadline && g.deadline >= g.start) ? Math.max(1, Math.min(52, Math.ceil((diffDays(g.start, g.deadline) + 1) / 7))) : 12;
 const goalFor = fid => S.goals.filter(g => g.frontId === fid && (!g.deadline || g.deadline >= today())).sort((a,b) => String(a.start||"").localeCompare(String(b.start||"")))[0];
@@ -867,7 +868,7 @@ VIEWS.bandeja = function(){
 };
 
 VIEWS.frentes = function(){
-  const proj = projects(), habs = active().filter(isHabitFront), fr = frozen();
+  const proj = projects(), habs = active().filter(isHabitFront), fr = frozen(), ids = ideas();
   const sect = f => {
     const hk = isHabitFront(f), ts = S.tasks.filter(t => t.frontId === f.id);
     const open = ts.filter(t => !t.done).sort((a,b) => (a.slot ? 0 : 1) - (b.slot ? 0 : 1) || (a.created||0) - (b.created||0));
@@ -900,7 +901,11 @@ VIEWS.frentes = function(){
     return `<div class="trow"><div class="tmain"><span class="ttitle">${esc(f.name)}</span><span class="tmeta">${join([isHabitFront(f) ? "Hábito" : `${n} ${n === 1 ? "tarea" : "tareas"}`, f.note ? esc(f.note) : ""])}</span></div>
       <button class="chip-btn" data-act="front-activate" data-id="${f.id}">Activar</button>
       <button class="more" data-act="front-sheet" data-id="${f.id}" aria-label="Opciones del frente">${ICON.more}</button></div>`;
-  }).join("")}</div>` : '<p class="empty">Nada congelado</p>'}</section>`;
+  }).join("")}</div>` : ""}
+  ${ids.length ? `<details data-keep="ideas" ${KEEP.has("ideas") ? "open" : ""}><summary>Ideas (${ids.length})</summary><div class="d-body"><div class="list">${ids.map(t => `<div class="trow"><div class="tmain"><span class="ttitle">${esc(t.title)}</span><span class="tmeta">Desde el ${fmtShort(t.someday)}</span></div>
+      <button class="chip-btn" data-act="idea-back" data-id="${t.id}">Activar</button>
+      <button class="more" data-act="move-sheet" data-id="${t.id}" aria-label="Opciones de la idea">${ICON.more}</button></div>`).join("")}</div></div></details>` : ""}
+  ${fr.length || ids.length ? "" : '<p class="empty">Nada congelado</p>'}</section>`;
 };
 
 VIEWS.metas = function(){
@@ -987,11 +992,11 @@ const HELP = {
   extras:["Extras", ["Hasta 2 tareas más, opcionales.", "Hazlas solo después de la principal."]],
   habitos:["Hábitos", ["La tarea dice <b>qué</b> hiciste; el hábito dice si fuiste <b>constante</b>.", "Si tiene tiempo, toca <b>▶</b>: al terminar el tiempo se marca solo. Si paras antes y pasaste el mínimo, cuenta como mínimo.", "¿Lo hiciste sin temporizador? Marca la casilla. En un día malo, toca <b>Solo mínimo</b>: la racha sigue.", "Un hábito ligado a un proyecto se marca solo cuando terminas una tarea de ese proyecto.", "Si te saltas un día programado, la app te avisa: nunca falles dos seguidos.", "Solo aparecen los días que tú eliges."]],
   dots:["Semana", ["Un punto por día.", "<b>Verde</b>: terminaste la principal. Día ganado.", "<b>Borde verde</b>: no terminaste la principal, pero cumpliste el mínimo de un hábito. La racha sigue.", "<b>Borde rojo</b>: ese día no hiciste ni la principal ni el mínimo."]],
-  manana:["Mañana", ["Cada noche, 5 minutos:", "1. Vacía la Bandeja.", "2. Elige la principal de mañana.", "3. Si quieres, hasta 2 extras.", "Mañana no decides nada: solo ejecutas."]],
-  bandeja:["Bandeja", ["Escribe aquí cualquier pendiente apenas se te ocurra, sin organizarlo.", "Marca la casilla si ya lo hiciste.", "Toca <b>Mover</b> para enviarlo a un frente.", "Déjala vacía cada noche."]],
+  manana:["Mañana", ["Cada noche, 5 minutos:", "1. Vacía la Bandeja: a un frente, hecho o congelado.", "2. Elige la principal de mañana.", "3. Si quieres, hasta 2 extras.", "Mañana no decides nada: solo ejecutas."]],
+  bandeja:["Bandeja", ["Escribe aquí cualquier pendiente o idea apenas se te ocurra, sin organizarlo.", "Marca la casilla si ya lo hiciste.", "Toca <b>Mover</b> para enviarlo a un frente, o <b>Congelar</b> si es para algún día.", "Déjala vacía cada noche."]],
   frentes:["Frentes", ["Al crear un frente eliges el tipo:", "<b>Proyecto</b>: tareas distintas, como CCFA o THM. Máximo 2 activos; el resto va a Congelados.", "<b>Hábito</b>: lo mismo cada día, como leer 20 minutos. No tiene tareas y no ocupa cupo.", "Debajo del nombre ves su objetivo, lo que toca esta semana y su hábito.", "Escribe tareas concretas que empiecen con un verbo: “Resolver la sala de XSS”.", "Toca <b>⋯</b> en una tarea para ponerla como principal de hoy o de mañana."]],
   habitosf:["Hábitos", ["Lo que haces igual cada día, como leer 20 minutos.", "No tienen tareas: en <b>Hoy</b> tocas <b>▶</b> y al terminar el tiempo se marca solo.", "No ocupan los 2 cupos de proyectos.", "Si le pones un objetivo con fechas, también tiene su bosque.", "Para cambiar el tiempo o los días: <b>⋯</b> → Editar hábito."]],
-  congelados:["Congelados", ["Proyectos que te interesan pero no son para ahora.", "No se pierden: quedan guardados con sus tareas.", "Toca <b>Activar</b> cuando tengas menos de 2 proyectos activos."]],
+  congelados:["Congelados", ["Proyectos e ideas que te interesan pero no son para ahora.", "No se pierden: quedan guardados con sus tareas.", "Toca <b>Activar</b> en un proyecto cuando tengas menos de 2 proyectos activos.", "<b>Ideas</b>: lo que congelaste desde la Bandeja. <b>Activar</b> la devuelve a la Bandeja; <b>⋯</b> la mueve a un frente."]],
   metas:["Metas", ["De lo grande a lo pequeño:", "<b>Visión</b>: hacia dónde vas en años.", "<b>Objetivo</b>: lo que logras entre una fecha de inicio y una fecha límite.", "<b>Semanas</b>: lo que debe estar hecho cada domingo.", "Las tareas del día van en Frentes."]],
   vision:["Visión", ["Una o dos frases sobre hacia dónde vas en los próximos años.", "Solo da dirección, no es una tarea."]],
   objetivos:["Objetivos", ["Un resultado medible con fecha límite, como “Aprobar la CCFA”.", "Las semanas salen solas de tus fechas: 4 semanas si pones un mes, 12 si pones tres.", "Si es de un hábito no tiene semanas: avanza por días (Día 5 de 23 · 4 días cumplidos).", "Escribe qué debe estar hecho cada semana y márcalo el domingo.", "En <b>Plan</b> quedan tu mínimo, cuándo lo haces y qué podría salir mal.", "El <b>bosque</b> crece con cada día que avanzas en el frente.", "La línea naranja de la barra marca el tiempo que ha pasado."]],
@@ -1008,6 +1013,7 @@ function helpSheet(k){
 
 /* ================= modales ================= */
 const modal = { render:null, live:false };
+const KEEP = new Set(); // <details data-keep> que dejaste abiertos: siguen abiertos al redibujar
 const autoGrow = el => { const y = window.scrollY; el.style.height = "auto"; el.style.height = Math.max(44, el.scrollHeight) + "px"; if (window.scrollY !== y) window.scrollTo(0, y); };
 const growAll = () => requestAnimationFrame(() => document.querySelectorAll("textarea.auto").forEach(autoGrow));
 function openModal(fn, live = true){ modal.render = fn; modal.live = live; modal.guard = !live; $("#modal").innerHTML = fn(); growAll(); const f = $("#modal [autofocus]"); if (f) f.focus(); }
@@ -1038,11 +1044,12 @@ function moveSheet(id){
   openModal(() => {
     const t = task(id); if (!t) return "";
     const opt = f => `<button class="opt ${t.frontId === f.id ? "sel" : ""}" data-act="move" data-id="${id}" data-front="${f.id}"><span class="grow">${esc(f.name)}</span></button>`;
-    const del = confirmKey === "del-" + id;
+    const del = confirmKey === "del-" + id, fr = frozen().filter(f => !isHabitFront(f)); // un frente de hábito no lleva tareas
+    const idea = !t.frontId && !t.someday ? `<button class="opt" data-act="idea-freeze" data-id="${id}"><span class="grow">Congelar · para algún día<small>Sin frente. Queda en Frentes → Congelados.</small></span></button>` : "";
     return sheet("Mover a…", `<p style="font-weight:700">${esc(t.title)}</p>
-      <div class="group-label">Frentes activos</div>${active().map(opt).join("") || '<p class="muted">Sin frentes activos.</p>'}
-      <div class="group-label">Congelados</div>${frozen().map(opt).join("") || '<p class="muted">Sin congelados.</p>'}
-      ${t.frontId ? `<button class="opt" data-act="move" data-id="${id}" data-front="">Volver a la Bandeja</button>` : ""}
+      <div class="group-label">Frentes activos</div>${projects().map(opt).join("") || '<p class="muted">Sin proyectos activos.</p>'}
+      <div class="group-label">Congelados</div>${idea}${fr.map(opt).join("") || (idea ? "" : '<p class="muted">Sin congelados.</p>')}
+      ${t.frontId || t.someday ? `<button class="opt" data-act="move" data-id="${id}" data-front="">Volver a la Bandeja</button>` : ""}
       <button class="opt danger" data-act="task-del" data-id="${id}">${del ? "Toca otra vez para borrar" : "Borrar"}</button>`);
   });
 }
@@ -1325,7 +1332,7 @@ function guideSheet(){
     <h3>Empezar</h3>
     <p>En Frentes toca <b>Crear frente</b> y elige el tipo. Un proyecto te guía por tareas → objetivo → hábito. Un hábito solo pide el tiempo al día y, si quieres, una meta con fecha.</p>
     <h3>Cada día</h3>
-    <ol><li><b>Durante el día:</b> lo que se te ocurra va a la Bandeja.</li><li><b>Cada noche, 5 min:</b> en Hoy → <b>Planear mañana</b>. Vacías la Bandeja y eliges la principal de mañana y hasta 2 extras.</li><li><b>Al día siguiente:</b> a la hora de <b>tu bloque</b> toca ▶ en la principal, trabaja y marca la casilla. En los hábitos con tiempo, toca ▶ y se marcan solos al terminar.</li><li><b>Si sales tarde:</b> pasada tu hora de Plan B, Hoy te avisa: solo el mínimo.</li><li><b>Día malo:</b> si no terminas la principal, haz el mínimo y toca <b>Solo mínimo</b> en el hábito.</li></ol>
+    <ol><li><b>Durante el día:</b> lo que se te ocurra va a la Bandeja.</li><li><b>Cada noche, 5 min:</b> en Hoy → <b>Planear mañana</b>. Vacías la Bandeja (cada nota va a un frente, queda hecha o se congela para algún día) y eliges la principal de mañana y hasta 2 extras.</li><li><b>Al día siguiente:</b> a la hora de <b>tu bloque</b> toca ▶ en la principal, trabaja y marca la casilla. En los hábitos con tiempo, toca ▶ y se marcan solos al terminar.</li><li><b>Si sales tarde:</b> pasada tu hora de Plan B, Hoy te avisa: solo el mínimo.</li><li><b>Día malo:</b> si no terminas la principal, haz el mínimo y toca <b>Solo mínimo</b> en el hábito.</li></ol>
     <h3>Tu bosque</h3>
     <p>Cada objetivo con fechas tiene una isla con un espacio por día. Cada día que avanzas en ese frente crece un árbol: con fruto si era la Principal, un brote si solo hiciste el mínimo. Si fallas un día que tocaba, el árbol se marchita; cumple al día siguiente y lo salvas. Si fallas dos seguidos, cae seco.</p>
     <h3>Cada domingo, 30 min</h3>
@@ -1454,10 +1461,10 @@ function nightRender(){
     const items = inbox();
     body = `<p class="wz-step">Paso 1 de 4</p><h3 class="wz-q">Vacía la Bandeja</h3>
       ${items.length ? `<div class="stack">${items.map(t => `<div class="card" style="gap:8px;padding:12px"><b>${esc(t.title)}</b> ${exB(t)}<div style="display:flex;gap:6px;flex-wrap:wrap">
-        ${active().map(f => `<button class="btn small" data-act="move" data-id="${t.id}" data-front="${f.id}" data-stay="1">${esc(f.name)}</button>`).join("")}
-        ${frozen()[0] ? `<button class="btn small" data-act="move" data-id="${t.id}" data-front="${(frozen().find(f => /alg[uú]n d[ií]a/i.test(f.name)) || frozen()[0]).id}" data-stay="1">Congelar</button>` : ""}
+        ${projects().map(f => `<button class="btn small" data-act="move" data-id="${t.id}" data-front="${f.id}" data-stay="1">${esc(f.name)}</button>`).join("")}
+        <button class="btn small" data-act="idea-freeze" data-id="${t.id}" data-stay="1">Congelar</button>
         <button class="btn small" data-act="inbox-done" data-id="${t.id}" data-stay="1">Hecho</button>
-        <button class="btn small danger" data-act="np-del" data-id="${t.id}">Borrar</button></div></div>`).join("")}</div>`
+        <button class="btn small danger" data-act="np-del" data-id="${t.id}">${confirmKey === "npdel-" + t.id ? "Toca otra vez" : "Borrar"}</button></div></div>`).join("")}</div>`
       : '<p class="empty">Bandeja vacía. Sigue al paso 2.</p>'}
       <button class="btn primary block" data-act="np-next">${items.length ? "Seguir con lo que queda" : "Siguiente"}</button>`;
   } else if (NP.step === 1){
@@ -1576,12 +1583,14 @@ const A = {
   "move-sheet"(d){ confirmKey = null; moveSheet(d.id); },
   "task-edit"(d){ taskEdit(d.id); },
   "task-del"(d){ if (confirmTap("del-" + d.id)){ remove("tasks", d.id); closeModal(); toast("Tarea borrada."); } },
-  move(d){ const t = task(d.id); if (!t) return; const f = front(d.front); put("tasks", {...t, frontId: d.front || null, ...(f && f.status !== "active" ? {...keepMiss(t), date:null, slot:null} : {})}); if (!d.stay) closeModal(); toast(f ? `Movida a ${f.name}.` : "De vuelta en la Bandeja."); },
+  move(d){ const t = task(d.id); if (!t) return; const f = front(d.front), {someday, ...rest} = t; put("tasks", {...rest, frontId: d.front || null, ...(f && f.status !== "active" ? {...keepMiss(t), date:null, slot:null} : {})}); if (!d.stay) closeModal(); toast(f ? `Movida a ${f.name}.` : "De vuelta en la Bandeja."); },
   assign(d){ if (assign(d.id, d.date, d.slot)) closeModal(); },
   unassign(d){ unassign(d.id); closeModal(); },
   carry(d){ const t = task(d.id); if (!t) return; const slot = t.slot === "critical" && !crit(today()) ? "critical" : "secondary"; assign(d.id, today(), slot); },
   pick(d){ pickSheet(d.date, d.slot); },
   "pick-do"(d){ if (assign(d.id, d.date, d.slot)) closeModal(); },
+  "idea-freeze"(d){ const t = task(d.id); if (!t) return; put("tasks", {...t, ...keepMiss(t), frontId:null, slot:null, date:null, someday:today()}); if (!d.stay) closeModal(); toast("Congelada. La ves en Frentes → Congelados."); },
+  "idea-back"(d){ const t = task(d.id); if (!t) return; const {someday, ...rest} = t; put("tasks", rest); toast("De vuelta en la Bandeja."); },
   "inbox-done"(d){ const t = task(d.id); if (!t) return; if (t.slot){ toggleDone(d.id); return; } remove("tasks", d.id); toast("Hecho y fuera de la Bandeja."); },
   hlog(d){ const h = S.habits.find(x => x.id === d.id); if (!h) return; const log = {...(h.log || {})}; const day = today();
     if (log[day] === d.k) delete log[day]; else log[day] = d.k; const grow = log[day] ? forestGrow(h.frontId, 1) : ""; put("habits", {...h, log});
@@ -1599,7 +1608,7 @@ const A = {
   night(){ nightOpen(); },
   "np-next"(){ NP.step = Math.min(3, NP.step + 1); sched(); },
   "np-back"(){ NP.step = Math.max(0, NP.step - 1); sched(); },
-  "np-del"(d){ remove("tasks", d.id); },
+  "np-del"(d){ if (confirmTap("npdel-" + d.id)) remove("tasks", d.id); },
   "np-pick"(d){ if (NP.step === 1){ NP.p1 = d.id; NP.p2 = NP.p2.filter(x => x !== d.id); }
     else { if (NP.p2.includes(d.id)) NP.p2 = NP.p2.filter(x => x !== d.id); else if (NP.p2.length < 2) NP.p2.push(d.id); else toast("Máximo 2 extras."); } sched(); },
   "np-save"(){
@@ -1736,6 +1745,7 @@ Object.assign(A, {
   "focus-finish"(d){ if (d.done && F.kind !== "habit"){ const t = task(F.id); if (t && !t.done) toggleDone(F.id); } F.id = null; renderFocus(); }
 });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && modal.render && !modal.guard) closeModal(); });
+document.addEventListener("toggle", e => { const k = e.target.dataset && e.target.dataset.keep; if (k) e.target.open ? KEEP.add(k) : KEEP.delete(k); }, true);
 document.addEventListener("visibilitychange", () => { if (!document.hidden && F.running) tick(); });
 
 /* ================= arranque ================= */

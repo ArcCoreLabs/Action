@@ -528,6 +528,50 @@ console.log('\nCongelar y activar');
   await nav(p, 'frentes'); await p.click('[data-act=help][data-k=congelados]'); ok(/menos de 2 proyectos activos/.test(await p.locator('.sheet').textContent()), 'la ayuda de Congelados habla de proyectos');
   ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
 }
+// ---------- 6c. ideas congeladas desde la Bandeja (Tarea 9) ----------
+console.log('\nIdeas congeladas');
+for (const scheme of ['light', 'dark']){
+  const seed = { ...base2(), ...readHabit(), 'fronts/e1':{ name:'eJPT', status:'frozen', order:50, created:4, pauses:[{ from:add(TODAY, -2) }] },
+    'tasks/n1':{ title:'Aprender a tocar guitarra', frontId:null, minutes:null, slot:null, date:null, done:false, created:1 },
+    'tasks/n2':{ title:'Llamar al banco', frontId:null, minutes:null, slot:null, date:null, done:false, created:2 } };
+  const p = await open(scheme, seed), badge = () => p.locator('#inboxBadge').textContent(), t = async id => (await store(p)).tasks.find(x => x.id === id);
+  await nav(p, 'bandeja'); await p.click('.trow:has-text("guitarra") [data-act=move-sheet]');
+  const sh = await p.locator('.sheet').textContent();
+  ok(/Congelados\s*Congelar · para algún día/.test(sh) && /eJPT/.test(sh) && !/Leer/.test(sh), `${scheme}: «Mover a…» ofrece Congelar primero y no ofrece el frente de hábito`);
+  await p.click('[data-act=idea-freeze]'); const tt = await toastText(p); await p.waitForTimeout(80);
+  let n1 = await t('n1');
+  ok(n1.someday === TODAY && !n1.frontId && /Congelada\. La ves en Frentes → Congelados\./.test(tt), `${scheme}: congelar la deja sin frente y con fecha ("${tt}")`);
+  ok(await p.locator('#view .trow').count() === 1 && await badge() === '1', `${scheme}: sale de la Bandeja y el punto baja a 1`);
+  // Planear mañana: Congelar siempre manda a Ideas (nunca a eJPT) y Borrar pide dos toques
+  await nav(p, 'hoy'); await p.click('[data-act=night]');
+  const card = p.locator('.sheet .card:has-text("Llamar")');
+  ok(await card.locator('[data-act=move]').count() === 2 && !/Leer/.test(await card.textContent()), `${scheme}: en Planear mañana solo salen los proyectos activos`);
+  await card.locator('[data-act=np-del]').click(); await p.waitForTimeout(60);
+  ok(await t('n2') && /Toca otra vez/.test(await card.textContent()), `${scheme}: Borrar en Planear mañana pide un segundo toque`);
+  await card.locator('[data-act=idea-freeze]').click(); await p.waitForTimeout(80);
+  const n2 = await t('n2'); ok(n2.someday === TODAY && !n2.frontId, `${scheme}: Congelar de Planear mañana manda a Ideas, no a eJPT`);
+  await p.click('[data-act=close]');
+  // Frentes → Congelados → Ideas
+  await nav(p, 'frentes'); const det = p.locator('details[data-keep=ideas]');
+  ok(/Ideas \(2\)/.test(await det.locator('summary').textContent()) && await p.locator('.front-head, .trow').filter({ hasText:'eJPT' }).count() === 1, `${scheme}: Congelados muestra eJPT y las Ideas (2)`);
+  await det.locator('summary').click(); await p.screenshot({ path:path.join(out, `ideas-${scheme}.png`), fullPage:true });
+  await det.locator('.trow:has-text("Llamar") [data-act=idea-back]').click(); await p.waitForTimeout(80);
+  ok(!(await t('n2')).someday && await badge() === '1' && /De vuelta en la Bandeja/.test(await toastText(p)), `${scheme}: Activar devuelve la idea a la Bandeja`);
+  ok(await det.evaluate(d => d.open) && /Ideas \(1\)/.test(await det.locator('summary').textContent()), `${scheme}: el grupo de Ideas sigue abierto al redibujar`);
+  await det.locator('[data-act=move-sheet]').click(); await p.click('.sheet [data-act=move][data-front=p1]'); await p.waitForTimeout(80);
+  n1 = await t('n1'); ok(n1.frontId === 'p1' && !('someday' in n1), `${scheme}: ⋯ mueve la idea a un frente y deja de ser idea`);
+  ok(await p.locator('details[data-keep=ideas]').count() === 0, `${scheme}: sin ideas no aparece el grupo`);
+  ok(!p.errs.length && await noScroll(p) === 390, `${scheme}: sin errores ni scroll ` + p.errs.join('|')); await p.close();
+}
+{ // sin frentes congelados también se puede congelar; la copia guarda las ideas
+  const p = await open('light', { ...base2(), 'tasks/n1':{ title:'Viajar a Japón', frontId:null, minutes:null, slot:null, date:null, done:false, created:1 } });
+  await nav(p, 'bandeja'); await p.click('[data-act=move-sheet]'); ok(!/Sin congelados/.test(await p.locator('.sheet').textContent()), 'sin frentes congelados igual se ofrece Congelar');
+  await p.click('[data-act=idea-freeze]'); await p.waitForTimeout(80); await nav(p, 'frentes');
+  ok(/Ideas \(1\)/.test(await p.locator('#view').textContent()) && !/Nada congelado/.test(await p.locator('#view').textContent()), 'Congelados muestra la idea y no dice «Nada congelado»');
+  await p.click('[data-act=settings]'); await p.click('[data-act=backup]'); await p.waitForTimeout(150);
+  const data = JSON.parse((await p.evaluate(() => window.__saved)).data).data;
+  ok(data.tasks.some(x => x.id === 'n1' && x.someday === TODAY), 'la copia guarda la idea congelada'); await p.close();
+}
 // ---------- 7. hojas en iPhone ----------
 console.log('\nHojas en iPhone');
 { // con su aspecto nativo, el iPhone (RenderThemeIOS) pone a los campos de hora y fecha relleno de .5em y box-sizing:content-box

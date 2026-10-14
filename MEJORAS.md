@@ -51,8 +51,8 @@ Cada fase termina con la app publicada y usable. No se empieza una fase sin cerr
 | Sección | Contenido |
 |---|---|
 | **Hoy** | Fecha · Principal · Extras · Hábitos de hoy · puntos de la semana · Mañana (plan de noche) |
-| **Bandeja** | Captura rápida. Casilla = hecho. "Mover" = enviar a un frente |
-| **Frentes** | Proyectos activos (con su objetivo, la meta de esta semana, su hábito y sus tareas) · Hábitos · Congelados |
+| **Bandeja** | Captura rápida. Casilla = hecho. "Mover" = enviar a un frente o congelarla como idea |
+| **Frentes** | Proyectos activos (con su objetivo, la meta de esta semana, su hábito y sus tareas) · Hábitos · Congelados (frentes e Ideas) |
 | **Metas** | Visión · Objetivos (barra de progreso, bosque, semanas marcables, plan plegable). Un objetivo de hábito no tiene semanas: avanza por días ("Día 5 de 23 · 4 días cumplidos") |
 | **Semana** | Estadísticas · revisión del domingo (3 preguntas, limpieza, semana de cada objetivo) · revisiones anteriores |
 
@@ -65,7 +65,8 @@ fronts/{id}   { name, note, status: "active"|"frozen", order, created, kind?: "h
                 pauses: [{from:"YYYY-MM-DD", to?:"YYYY-MM-DD"}] }   // periodos congelado; el bosque no cuenta fallos ahí
 tasks/{id}    { title, frontId|null, minutes|null, slot: null|"critical"|"secondary",
                 date: "YYYY-MM-DD"|null, done, doneAt, created, archived?,
-                missed?: ["YYYY-MM-DD"] }                      // días en que fue la Principal y no se hizo (se guarda al moverla o quitarla)
+                missed?: ["YYYY-MM-DD"],                       // días en que fue la Principal y no se hizo (se guarda al moverla o quitarla)
+                someday?: "YYYY-MM-DD" }                       // idea congelada desde la Bandeja (sin frente ni plan); sale de inbox() y va a ideas()
 goals/{id}    { frontId, title, why, start, deadline, standard, minimum, trigger,
                 weekly: [{text, done}],         // largo = goalWeeks(g), sale de las fechas
                 premortem: [{cause, counter}×3], rewardMid, rewardEnd, created }
@@ -88,7 +89,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 ### Mapa del código (funciones clave)
 
 - **Estado y escritura:** `S`, `put`, `remove`, `putMeta`, `run` (cola), `init()` (suscripciones).
-- **Consultas:** `active`, `frozen`, `crit(d)`, `secs(d)`, `inbox`, `goalFor(fid)`, `goalWeeks`, `goalWeek`, `scheduled`, `streak`, `missedRun`, `dayState`.
+- **Consultas:** `active`, `frozen`, `crit(d)`, `secs(d)`, `inbox`, `ideas`, `goalFor(fid)`, `goalWeeks`, `goalWeek`, `scheduled`, `streak`, `missedRun`, `dayState`.
 - **Lógica:** `assign`, `unassign`, `toggleDone`, `syncHabit`.
 - **Render:** `render()` (conserva el foco), `VIEWS.{hoy,bandeja,frentes,metas,semana}`, `taskRow`, `head`, `dash`, `info`.
 - **Modales:** `openModal(fn, live)` (cuando `live=false` no se redibuja con cada cambio y `modal.guard` evita cerrarlo tocando fuera), `sheet()`, `taskSheet`, `pickSheet`, `frontSheet`, `goalForm`, `habitsEdit`, `habitEditOne`, `habitNew`, `habitQuick`, `wizardOpen` (W), `nightOpen`/`nightRender` (NP), `settingsSheet`, `guideSheet`, `helpSheet`.
@@ -222,7 +223,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 
 **Listo cuando:** congelar y activar no cambian el pasado ni dejan tareas del frente en Hoy. Cubierto por `tests/run.mjs` («Congelar y activar»).
 
-### Tarea 9: Ideas congeladas desde la Bandeja *(fase 2 · adelantada)*
+### Tarea 9: Ideas congeladas desde la Bandeja *(fase 2 · hecha, falta publicar)*
 
 **Problema:** «las notas que ponga en bandeja debería poder moverlas a congelar… no solo de mis frentes activos sino general». Hoy «Mover a…» solo ofrece frentes, y el «Congelar» de «Planear mañana» manda la nota al primer frente congelado que encuentre (con los datos reales, a eJPT, donde queda escondida como «1 tarea»).
 
@@ -230,10 +231,12 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 - Campo opcional `tasks.someday: "YYYY-MM-DD"` (día en que se congeló) en notas sin frente y sin plan. `inbox()` las excluye (el punto de la Bandeja baja); `ideas()` las lista.
 - «Mover a…» de una nota sin frente: primera opción **Congelar · para algún día**. El «Congelar» de «Planear mañana» hace lo mismo (se quita la búsqueda por nombre «Algún día»).
 - Frentes → Congelados: grupo plegado **Ideas (N)**. Cada idea con «Activar» (vuelve a la Bandeja) y ⋯ («Mover a…»: frentes y Borrar). «Nada congelado» solo si no hay ni ideas ni frentes.
-- Los frentes de hábito no se ofrecen como destino de una nota (no muestran tareas). En «Planear mañana», «Borrar» pide dos toques como en «Mover a…».
+- Los frentes de hábito no se ofrecen como destino de una nota (no llevan tareas). En «Planear mañana», «Borrar» pide dos toques como en «Mover a…».
 - Ayuda y guía: Bandeja, Congelados, Mañana.
 
 **Listo cuando:** una idea general se congela con dos toques, no aparece en la Bandeja ni en ningún frente, se ve en Congelados y vuelve a la Bandeja con «Activar»; la copia y la restauración la conservan.
+
+**Hecho:** `ideas()`, acciones `idea-freeze` y `idea-back`; `move` quita `someday`. El aviso dice dónde quedó: «Congelada. La ves en Frentes → Congelados.». El grupo «Ideas (N)» va plegado al final de Congelados (la idea más reciente arriba, con «Desde el …») y recuerda si lo abriste (`KEEP` + `<details data-keep>`). Cubierto por `tests/run.mjs` («Ideas congeladas»).
 
 ### Tarea 10: Frentes congelados sin fechas; las fechas al activar *(fase 2 · adelantada)*
 
