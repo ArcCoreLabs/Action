@@ -216,6 +216,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 
 **Hecho:**
 - `scheduled(h, d)` mira si el frente estaba congelado **ese día** (`paused`), no si lo está hoy. Se quitaron `habitPaused` y `prevScheduled`.
+- La racha cuenta el hábito que hiciste el mismo día en que congelaste, y los puntos de la semana cuentan como fallo una Principal fallada que se movió (`tasks.missed`).
 - `missedRun` se corta en un tramo congelado; el bosque también (`forestDays` reinicia la cuenta y `forestWilting` no pide salvar un árbol de antes de congelar). Hoy congelado no es semilla ni se marca en la isla, y `forestGoal` no da bosque a un frente congelado.
 - **Congelar** saca del plan la Principal, los Extras y lo pendiente del frente (`keepMiss` guarda la Principal fallada) y el aviso lo dice: «CCFA congelado. Salió de tu plan: Estudiar módulo 3.».
 - Metas: un objetivo vencido no marca ninguna semana como «esta semana».
@@ -236,7 +237,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 
 **Listo cuando:** una idea general se congela con dos toques, no aparece en la Bandeja ni en ningún frente, se ve en Congelados y vuelve a la Bandeja con «Activar»; la copia y la restauración la conservan.
 
-**Hecho:** `ideas()`, acciones `idea-freeze` y `idea-back`; `move` quita `someday`. El aviso dice dónde quedó: «Congelada. La ves en Frentes → Congelados.». El grupo «Ideas (N)» va plegado al final de Congelados (la idea más reciente arriba, con «Desde el …») y recuerda si lo abriste (`KEEP` + `<details data-keep>`). Cubierto por `tests/run.mjs` («Ideas congeladas»).
+**Hecho:** `ideas()`, acciones `idea-freeze` (no se puede sobre una nota hecha) y `idea-back`; `move` quita `someday`. «Congelar · para algún día» va de primero en «Mover a…», encima de los frentes. En «Planear mañana», «Borrar» se arma en el mismo botón («¿Borrar?») sin redibujar, así la hoja no salta. Las fechas de otro año llevan el año (`fmtDay`). El aviso dice dónde quedó: «Congelada. La ves en Frentes → Congelados.». El grupo «Ideas (N)» va plegado al final de Congelados (la idea más reciente arriba, con «Desde el …») y recuerda si lo abriste (`KEEP` + `<details data-keep>`). Cubierto por `tests/run.mjs` («Ideas congeladas»).
 
 ### Tarea 10: Frentes congelados sin fechas; las fechas al activar *(fase 2 · hecha, falta publicar)*
 

@@ -524,6 +524,16 @@ console.log('\nCongelar y activar');
   p = await open('light', { ...seedGoal({ start:add(TODAY, -3), days:28, habit:false }), 'tasks/a':plan['tasks/a'] });
   await nav(p, 'frentes'); await p.click('[data-act=front-sheet][data-id=f1]'); await p.click('[data-act=front-freeze]');
   ok((await toastText(p)) === 'CCFA congelado. Salió de tu plan: Estudiar módulo 3.', 'con una sola tarea la nombra'); await p.close();
+  // un proyecto sin hábito: la Principal fallada de ayer sigue en rojo después de congelarlo
+  p = await open('light', { ...seedGoal({ start:add(TODAY, -3), days:28, habit:false }), 'tasks/c':plan['tasks/c'] });
+  ok(await dotCls(p, 2) === 'miss', 'sin hábito, la Principal fallada de ayer está en rojo');
+  await nav(p, 'frentes'); await p.click('[data-act=front-sheet][data-id=f1]'); await p.click('[data-act=front-freeze]'); await p.waitForTimeout(80); await nav(p, 'hoy');
+  ok(await dotCls(p, 2) === 'miss', 'al congelarlo sigue en rojo'); await p.close();
+  // lo que hiciste el día que congelaste sigue contando en la racha
+  p = await open('light', { ...base2(), ...readHabit(), 'fronts/h1':{ ...readHabit()['fronts/h1'], status:'frozen', pauses:[{ from:add(TODAY, -1) }] },
+    'habits/hb':{ ...readHabit()['habits/hb'], created:add(TODAY, -6), log:Object.fromEntries([-6,-5,-4,-3,-2,-1].map(i => [add(TODAY, i), 'full'])) } });
+  await nav(p, 'frentes'); await p.click('.trow [data-act=front-activate][data-id=h1]'); await p.waitForTimeout(80); await nav(p, 'hoy');
+  ok(/6 días seguidos/.test(await p.locator('#view').textContent()), 'el hábito del día en que congelaste sigue en la racha'); await p.close();
   // el bosque de un frente congelado no marca hoy; un objetivo vencido no tiene «esta semana»
   p = await open('light', { ...seedGoal({ start:add(TODAY, -6), days:28, levels:seq(add(TODAY, -6), [2,2,2]), frontExtra:{ status:'frozen', pauses:[{ from:add(TODAY, -3) }] } }) });
   await nav(p, 'metas'); ok(await p.locator('.forest .today').count() === 0, 'el bosque de un frente congelado no marca hoy'); await p.close();
@@ -541,7 +551,7 @@ for (const scheme of ['light', 'dark']){
   const p = await open(scheme, seed), badge = () => p.locator('#inboxBadge').textContent(), t = async id => (await store(p)).tasks.find(x => x.id === id);
   await nav(p, 'bandeja'); await p.click('.trow:has-text("guitarra") [data-act=move-sheet]');
   const sh = await p.locator('.sheet').textContent();
-  ok(/Congelados\s*Congelar · para algún día/.test(sh) && /eJPT/.test(sh) && !/Leer/.test(sh), `${scheme}: «Mover a…» ofrece Congelar primero y no ofrece el frente de hábito`);
+  ok(/^Mover a…\s*Aprender a tocar guitarraCongelar · para algún día/.test(sh) && /eJPT/.test(sh) && !/Leer/.test(sh), `${scheme}: «Mover a…» ofrece Congelar de primero y no ofrece el frente de hábito`);
   await p.click('[data-act=idea-freeze]'); const tt = await toastText(p); await p.waitForTimeout(80);
   let n1 = await t('n1');
   ok(n1.someday === TODAY && !n1.frontId && /Congelada\. La ves en Frentes → Congelados\./.test(tt), `${scheme}: congelar la deja sin frente y con fecha ("${tt}")`);
@@ -551,7 +561,7 @@ for (const scheme of ['light', 'dark']){
   const card = p.locator('.sheet .card:has-text("Llamar")');
   ok(await card.locator('[data-act=move]').count() === 2 && !/Leer/.test(await card.textContent()), `${scheme}: en Planear mañana solo salen los proyectos activos`);
   await card.locator('[data-act=np-del]').click(); await p.waitForTimeout(60);
-  ok(await t('n2') && /Toca otra vez/.test(await card.textContent()), `${scheme}: Borrar en Planear mañana pide un segundo toque`);
+  ok(await t('n2') && /¿Borrar\?/.test(await card.textContent()), `${scheme}: Borrar en Planear mañana pide un segundo toque`);
   await card.locator('[data-act=idea-freeze]').click(); await p.waitForTimeout(80);
   const n2 = await t('n2'); ok(n2.someday === TODAY && !n2.frontId, `${scheme}: Congelar de Planear mañana manda a Ideas, no a eJPT`);
   await p.click('[data-act=close]');
@@ -566,6 +576,17 @@ for (const scheme of ['light', 'dark']){
   n1 = await t('n1'); ok(n1.frontId === 'p1' && !('someday' in n1), `${scheme}: ⋯ mueve la idea a un frente y deja de ser idea`);
   ok(await p.locator('details[data-keep=ideas]').count() === 0, `${scheme}: sin ideas no aparece el grupo`);
   ok(!p.errs.length && await noScroll(p) === 390, `${scheme}: sin errores ni scroll ` + p.errs.join('|')); await p.close();
+}
+{ // una nota ya hecha no se puede congelar; en Planear mañana, borrar una nota de abajo no hace saltar la hoja
+  const seed = { ...base2() }; for (let i = 1; i <= 9; i++) seed[`tasks/n${i}`] = { title:`Nota ${i}`, frontId:null, minutes:null, slot:null, date:null, done:false, created:i };
+  seed['tasks/d1'] = { title:'Pagar la factura', frontId:null, minutes:45, slot:'critical', date:TODAY, done:true, doneAt:TODAY, created:20 };
+  const p = await open('light', seed);
+  await p.click('.main-task [data-act=task-sheet]'); await p.click('[data-act=move-sheet]');
+  ok(await p.locator('[data-act=idea-freeze]').count() === 0, 'una Principal ya hecha no ofrece Congelar'); await p.click('[data-act=close]');
+  await p.click('[data-act=night]'); const sh = p.locator('#modal .sheet'); await sh.evaluate(e => { e.scrollTop = e.scrollHeight; });
+  const top = await sh.evaluate(e => e.scrollTop), btn = p.locator('[data-act=np-del][data-id=n9]');
+  await btn.click(); ok(await sh.evaluate(e => e.scrollTop) === top && (await btn.textContent()) === '¿Borrar?', 'el primer toque no mueve la hoja');
+  await btn.click(); await p.waitForTimeout(80); ok(!(await store(p)).tasks.some(x => x.id === 'n9'), 'el segundo toque en el mismo lugar borra la nota'); await p.close();
 }
 { // sin frentes congelados también se puede congelar; la copia guarda las ideas
   const p = await open('light', { ...base2(), 'tasks/n1':{ title:'Viajar a Japón', frontId:null, minutes:null, slot:null, date:null, done:false, created:1 } });

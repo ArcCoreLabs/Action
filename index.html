@@ -469,6 +469,7 @@ const diffDays = (a,b) => Math.round((parse(b) - parse(a)) / 864e5);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
 const fmt = (s, o) => new Intl.DateTimeFormat("es-CO", o).format(parse(s));
 const fmtShort = s => fmt(s, {day:"numeric", month:"short"});
+const fmtDay = s => s.slice(0, 4) === today().slice(0, 4) ? fmtShort(s) : fmt(s, {day:"numeric", month:"short", year:"numeric"}); // con año si no es de este año
 const DAYS = ["D","L","M","X","J","V","S"];
 const DAYNAMES = ["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
 const ICON = {
@@ -545,7 +546,7 @@ function streak(h){
   if (!log[d]) d = addDays(d, -1);
   for (let i = 0; i < 500; i++){
     if (h.created && d < h.created) break;
-    if (scheduled(h, d)){ if (log[d]) n++; else break; }
+    if (log[d] && (h.days || []).includes(dow(d))) n++; else if (scheduled(h, d)) break; // lo que hiciste el día que congelaste sigue contando
     d = addDays(d, -1);
   }
   return n;
@@ -564,7 +565,7 @@ function dayState(d){
   const c = crit(d);
   if (c && c.done) return "win";
   if (S.habits.some(h => (h.log || {})[d])) return "min";
-  if (d < today() && (c || S.habits.some(h => scheduled(h, d) && (!h.created || d >= h.created)))) return "miss";
+  if (d < today() && (c || S.tasks.some(t => (t.missed || []).includes(d)) || S.habits.some(h => scheduled(h, d) && (!h.created || d >= h.created)))) return "miss"; // una Principal fallada que se movió sigue en rojo
   return "none";
 }
 function goalWeek(g){ // 0 = aún no empieza
@@ -907,7 +908,7 @@ VIEWS.frentes = function(){
       <button class="chip-btn" data-act="front-activate" data-id="${f.id}">Activar</button>
       <button class="more" data-act="front-sheet" data-id="${f.id}" aria-label="Opciones del frente">${ICON.more}</button></div>`;
   }).join("")}</div>` : ""}
-  ${ids.length ? `<details data-keep="ideas" ${KEEP.has("ideas") ? "open" : ""}><summary>Ideas (${ids.length})</summary><div class="d-body"><div class="list">${ids.map(t => `<div class="trow"><div class="tmain"><span class="ttitle">${esc(t.title)}</span><span class="tmeta">Desde el ${fmtShort(t.someday)}</span></div>
+  ${ids.length ? `<details data-keep="ideas" ${KEEP.has("ideas") ? "open" : ""}><summary>Ideas (${ids.length})</summary><div class="d-body"><div class="list">${ids.map(t => `<div class="trow"><div class="tmain"><span class="ttitle">${esc(t.title)}</span><span class="tmeta">Desde el ${fmtDay(t.someday)}</span></div>
       <button class="chip-btn" data-act="idea-back" data-id="${t.id}">Activar</button>
       <button class="more" data-act="move-sheet" data-id="${t.id}" aria-label="Opciones de la idea">${ICON.more}</button></div>`).join("")}</div></div></details>` : ""}
   ${fr.length || ids.length ? "" : '<p class="empty">Nada congelado</p>'}</section>`;
@@ -953,7 +954,7 @@ VIEWS.metas = function(){
   <section class="block">${head("Objetivos", "objetivos")}
   ${goals.map(sect).join("")}
   ${cold.length ? `<details data-keep="metas-cold" ${KEEP.has("metas-cold") ? "open" : ""} style="margin-bottom:16px"><summary>Congelados (${cold.length})</summary><div class="d-body"><div class="list">${cold.map(g => { const f = front(g.frontId), from = pauseFrom(f);
-    return `<div class="trow"><div class="tmain"><span class="ttitle">${esc(g.title || "Objetivo sin nombre")}</span><span class="tmeta">${join([esc(f.name), from && from !== "2000-01-01" ? `Congelado desde el ${fmtShort(from)}` : "Congelado"])}</span></div>
+    return `<div class="trow"><div class="tmain"><span class="ttitle">${esc(g.title || "Objetivo sin nombre")}</span><span class="tmeta">${join([esc(f.name), from && from !== "2000-01-01" ? `Congelado desde el ${fmtDay(from)}` : "Congelado"])}</span></div>
       <button class="more" data-act="goal-sheet" data-id="${g.id}" aria-label="Opciones">${ICON.more}</button></div>`; }).join("")}</div></div></details>` : ""}
   ${dash("Nuevo objetivo", "goal-new")}</section>`;
 };
@@ -1002,8 +1003,8 @@ const HELP = {
   extras:["Extras", ["Hasta 2 tareas más, opcionales.", "Hazlas solo después de la principal."]],
   habitos:["Hábitos", ["La tarea dice <b>qué</b> hiciste; el hábito dice si fuiste <b>constante</b>.", "Si tiene tiempo, toca <b>▶</b>: al terminar el tiempo se marca solo. Si paras antes y pasaste el mínimo, cuenta como mínimo.", "¿Lo hiciste sin temporizador? Marca la casilla. En un día malo, toca <b>Solo mínimo</b>: la racha sigue.", "Un hábito ligado a un proyecto se marca solo cuando terminas una tarea de ese proyecto.", "Si te saltas un día programado, la app te avisa: nunca falles dos seguidos.", "Solo aparecen los días que tú eliges."]],
   dots:["Semana", ["Un punto por día.", "<b>Verde</b>: terminaste la principal. Día ganado.", "<b>Borde verde</b>: no terminaste la principal, pero cumpliste el mínimo de un hábito. La racha sigue.", "<b>Borde rojo</b>: ese día no hiciste ni la principal ni el mínimo."]],
-  manana:["Mañana", ["Cada noche, 5 minutos:", "1. Vacía la Bandeja: a un frente, hecho o congelado.", "2. Elige la principal de mañana.", "3. Si quieres, hasta 2 extras.", "Mañana no decides nada: solo ejecutas."]],
-  bandeja:["Bandeja", ["Escribe aquí cualquier pendiente o idea apenas se te ocurra, sin organizarlo.", "Marca la casilla si ya lo hiciste.", "Toca <b>Mover</b> para enviarlo a un frente, o <b>Congelar</b> si es para algún día.", "Déjala vacía cada noche."]],
+  manana:["Mañana", ["Cada noche, 5 minutos:", "1. Vacía la Bandeja: cada nota a un frente, a Hecho o a Congelar.", "2. Elige la principal de mañana.", "3. Si quieres, hasta 2 extras.", "Mañana no decides nada: solo ejecutas."]],
+  bandeja:["Bandeja", ["Escribe aquí cualquier pendiente o idea apenas se te ocurra, sin organizarlo.", "Marca la casilla si ya lo hiciste.", "Toca <b>Mover</b> para enviarlo a un frente o congelarlo para algún día.", "Déjala vacía cada noche."]],
   frentes:["Frentes", ["Al crear un frente eliges el tipo:", "<b>Proyecto</b>: tareas distintas, como CCFA o THM. Máximo 2 activos; el resto va a Congelados.", "<b>Hábito</b>: lo mismo cada día, como leer 20 minutos. No tiene tareas y no ocupa cupo.", "Y si empieza <b>Activo</b> o <b>Congelado</b>. Congelado no pide fechas ni crea bosque: las eliges al activarlo.", "Debajo del nombre ves su objetivo, lo que toca esta semana y su hábito.", "Escribe tareas concretas que empiecen con un verbo: “Resolver la sala de XSS”.", "Toca <b>⋯</b> en una tarea para ponerla como principal de hoy o de mañana."]],
   habitosf:["Hábitos", ["Lo que haces igual cada día, como leer 20 minutos.", "No tienen tareas: en <b>Hoy</b> tocas <b>▶</b> y al terminar el tiempo se marca solo.", "No ocupan los 2 cupos de proyectos.", "Si le pones un objetivo con fechas, también tiene su bosque.", "Para cambiar el tiempo o los días: <b>⋯</b> → Editar hábito."]],
   congelados:["Congelados", ["Proyectos e ideas que te interesan pero no son para ahora.", "No se pierden: quedan guardados con sus tareas (las ves en <b>⋯</b>).", "Toca <b>Activar</b> en un frente: si tiene objetivo, ahí eliges sus fechas y desde ese día crece su bosque. Si ya tienes 2 proyectos activos, ahí mismo congelas uno.", "<b>Nuevo</b> crea un frente que empieza congelado.", "<b>Ideas</b>: lo que congelaste desde la Bandeja. <b>Activar</b> la devuelve a la Bandeja; <b>⋯</b> la mueve a un frente."]],
@@ -1055,10 +1056,10 @@ function moveSheet(id){
     const t = task(id); if (!t) return "";
     const opt = f => `<button class="opt ${t.frontId === f.id ? "sel" : ""}" data-act="move" data-id="${id}" data-front="${f.id}"><span class="grow">${esc(f.name)}</span></button>`;
     const del = confirmKey === "del-" + id, fr = frozen().filter(f => !isHabitFront(f)); // un frente de hábito no lleva tareas
-    const idea = !t.frontId && !t.someday ? `<button class="opt" data-act="idea-freeze" data-id="${id}"><span class="grow">Congelar · para algún día<small>Sin frente. Queda en Frentes → Congelados.</small></span></button>` : "";
-    return sheet("Mover a…", `<p style="font-weight:700">${esc(t.title)}</p>
+    const idea = !t.frontId && !t.someday && !t.done ? `<button class="opt" data-act="idea-freeze" data-id="${id}"><span class="grow">Congelar · para algún día<small>Sin frente. Queda en Frentes → Congelados.</small></span></button>` : "";
+    return sheet("Mover a…", `<p style="font-weight:700">${esc(t.title)}</p>${idea}
       <div class="group-label">Frentes activos</div>${projects().map(opt).join("") || '<p class="muted">Sin proyectos activos.</p>'}
-      <div class="group-label">Congelados</div>${idea}${fr.map(opt).join("") || (idea ? "" : '<p class="muted">Sin congelados.</p>')}
+      ${fr.length ? `<div class="group-label">Congelados</div>${fr.map(opt).join("")}` : ""}
       ${t.frontId || t.someday ? `<button class="opt" data-act="move" data-id="${id}" data-front="">Volver a la Bandeja</button>` : ""}
       <button class="opt danger" data-act="task-del" data-id="${id}">${del ? "Toca otra vez para borrar" : "Borrar"}</button>`);
   });
@@ -1513,7 +1514,7 @@ function nightRender(){
         ${projects().map(f => `<button class="btn small" data-act="move" data-id="${t.id}" data-front="${f.id}" data-stay="1">${esc(f.name)}</button>`).join("")}
         <button class="btn small" data-act="idea-freeze" data-id="${t.id}" data-stay="1">Congelar</button>
         <button class="btn small" data-act="inbox-done" data-id="${t.id}" data-stay="1">Hecho</button>
-        <button class="btn small danger" data-act="np-del" data-id="${t.id}">${confirmKey === "npdel-" + t.id ? "Toca otra vez" : "Borrar"}</button></div></div>`).join("")}</div>`
+        <button class="btn small danger" data-act="np-del" data-id="${t.id}">${confirmKey === "npdel-" + t.id ? "¿Borrar?" : "Borrar"}</button></div></div>`).join("")}</div>`
       : '<p class="empty">Bandeja vacía. Sigue al paso 2.</p>'}
       <button class="btn primary block" data-act="np-next">${items.length ? "Seguir con lo que queda" : "Siguiente"}</button>`;
   } else if (NP.step === 1){
@@ -1638,7 +1639,7 @@ const A = {
   carry(d){ const t = task(d.id); if (!t) return; const slot = t.slot === "critical" && !crit(today()) ? "critical" : "secondary"; assign(d.id, today(), slot); },
   pick(d){ pickSheet(d.date, d.slot); },
   "pick-do"(d){ if (assign(d.id, d.date, d.slot)) closeModal(); },
-  "idea-freeze"(d){ const t = task(d.id); if (!t) return; put("tasks", {...t, ...keepMiss(t), frontId:null, slot:null, date:null, someday:today()}); if (!d.stay) closeModal(); toast("Congelada. La ves en Frentes → Congelados."); },
+  "idea-freeze"(d){ const t = task(d.id); if (!t || t.done) return; put("tasks", {...t, ...keepMiss(t), frontId:null, slot:null, date:null, someday:today()}); if (!d.stay) closeModal(); toast("Congelada. La ves en Frentes → Congelados."); }, // una nota hecha no es una idea
   "idea-back"(d){ const t = task(d.id); if (!t) return; const {someday, ...rest} = t; put("tasks", rest); toast("De vuelta en la Bandeja."); },
   "inbox-done"(d){ const t = task(d.id); if (!t) return; if (t.slot){ toggleDone(d.id); return; } remove("tasks", d.id); toast("Hecho y fuera de la Bandeja."); },
   hlog(d){ const h = S.habits.find(x => x.id === d.id); if (!h) return; const log = {...(h.log || {})}; const day = today();
@@ -1657,7 +1658,9 @@ const A = {
   night(){ nightOpen(); },
   "np-next"(){ NP.step = Math.min(3, NP.step + 1); sched(); },
   "np-back"(){ NP.step = Math.max(0, NP.step - 1); sched(); },
-  "np-del"(d){ if (confirmTap("npdel-" + d.id)) remove("tasks", d.id); },
+  "np-del"(d, el){ const k = "npdel-" + d.id; // se arma en el botón, sin redibujar: la hoja no salta arriba
+    if (confirmKey !== k){ confirmKey = k; el.textContent = "¿Borrar?"; setTimeout(() => { if (confirmKey === k){ confirmKey = null; const b = document.querySelector(`[data-act=np-del][data-id="${d.id}"]`); if (b) b.textContent = "Borrar"; } }, 4000); return; }
+    confirmKey = null; remove("tasks", d.id); },
   "np-pick"(d){ if (NP.step === 1){ NP.p1 = d.id; NP.p2 = NP.p2.filter(x => x !== d.id); }
     else { if (NP.p2.includes(d.id)) NP.p2 = NP.p2.filter(x => x !== d.id); else if (NP.p2.length < 2) NP.p2.push(d.id); else toast("Máximo 2 extras."); } sched(); },
   "np-save"(){
