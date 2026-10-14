@@ -256,11 +256,12 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 **Hecho:**
 - Asistente: `W.frozen`, `wzFrozen()` (también si ya hay 2 proyectos activos: «Activo» queda apagado) y `wzFlow()` (proyecto congelado: Frente → Tareas → Objetivo). «Nuevo» de Congelados abre en Congelado (`data-frozen`).
 - `goalFields(g, {noDates})` (por defecto, si el frente está congelado) oculta `#g-dates` y `#g-weeks-box`, deja visibles qué y por qué y pliega lo demás; `datesFields()` es el bloque de fechas compartido con la hoja de activar. `readGoalFields` conserva las fechas que tuviera si están ocultas y `FORMS.goal` solo las exige si se ven. Cambiar de frente en el formulario las muestra u oculta.
-- `pauseFrom(f)`, `isFrozen(fid)`, `planGoal(f)` (el objetivo que seguía vivo al congelarlo, o el creado sin fechas).
+- `pauseFrom(f)`, `isFrozen(fid)`, `liveGoals(f)` / `planGoal(f)` (los objetivos que seguían vivos al congelarlo, o creados sin fechas), `goalDone`, `actDates`, `durTxt`.
 - «Activar» (`front-activate`): sin objetivo y con cupo, un toque. Si no, `activateSheet()` con las fechas de `actDates()`: sin avance, desde el próximo lunes (hoy en un hábito) con la misma duración; con avance, el mismo inicio y la fecha límite corrida los días congelados («se corrió N días»). Sin cupo, «Congelar X y activar Y» (`activate-go` con `data-out`). Las semanas se ajustan a las fechas nuevas. `freezeFront`/`activateFront` son las mismas que usan Congelar y Activar.
 - Metas: los objetivos de frentes congelados van plegados en «Congelados (N)» (`data-keep="metas-cold"`) con «Congelado desde el …». Un objetivo sin fechas en un frente activo dice «Sin fechas · ponlas en ⋯ → Editar» y no inventa semanas (tampoco en Frentes ni en Semana).
 - Frentes: la fila de un congelado dice su objetivo y su ⋯ muestra sus tareas con «Mover».
-- Cubierto por `tests/run.mjs` («Frentes congelados sin fechas»).
+- Revisión: `liveGoals(f)` deja fuera los objetivos cumplidos (`goalDone`) y pone primero los que tienen fechas (también `goalFor`); al activar, **todos** los objetivos vivos del frente reciben fechas. Solo el tramo congelado que se cierra corre la fecha límite (los anteriores ya la corrieron). En la hoja de activar, mover el inicio conserva la duración («Duración: 4 semanas»). Si ya tenía avance: «Sigue donde ibas…» y «Su bosque sigue donde iba.». Si pasas a Congelado después de llenar el hábito, ese hábito no se crea. En el formulario, pasar a un frente activo abre el plan por semanas. El primer paso del asistente separa «Tipo» y «¿Empieza ya?».
+- Cubierto por `tests/run.mjs` («Frentes congelados sin fechas» y sus arreglos).
 
 ### Tarea 4: IA dentro de la app *(media)*
 

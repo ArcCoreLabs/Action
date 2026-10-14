@@ -626,7 +626,7 @@ for (const scheme of ['light', 'dark']){
   g = (await store(p)).goals.find(x => x.frontId === f.id); ok(g.title === 'Obtener la eJPT este año' && g.start === null, `${scheme}: se guarda sin fechas`);
   // la hoja del frente congelado muestra sus tareas
   await nav(p, 'frentes'); await p.click(`[data-act=front-sheet][data-id="${f.id}"]`);
-  ok(/Tareas\s*Repasar Nmap/.test(await p.locator('.sheet').textContent()) && /Eliges cuándo empieza su objetivo/.test(await p.locator('.sheet').textContent()), `${scheme}: ⋯ de un congelado muestra sus tareas`);
+  ok(/Tareas\s*Repasar Nmap/.test(await p.locator('.sheet').textContent()) && /Eliges las fechas de su objetivo/.test(await p.locator('.sheet').textContent()), `${scheme}: ⋯ de un congelado muestra sus tareas`);
   await p.click('[data-act=close]');
   // activar: la hoja pide las fechas (próximo lunes + 4 semanas) y desde ahí empieza el bosque
   await p.click(`.trow [data-act=front-activate][data-id="${f.id}"]`);
@@ -673,6 +673,45 @@ for (const scheme of ['light', 'dark']){
   ok(!(await p.locator('#g-start').isVisible()), 'un hábito congelado no pide fechas para su meta'); await p.click('[data-act=wz-skip]'); await p.waitForTimeout(100);
   const gf = (await store(p)).fronts.find(x => x.name === 'Guitarra'); ok(gf.status === 'frozen' && gf.kind === 'habit', 'el hábito queda congelado');
   await nav(p, 'hoy'); ok(!/Guitarra/.test(await p.locator('#view').textContent()), 'y no sale en Hoy'); ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
+}
+{ // arreglos de la revisión de la Tarea 10
+  const one = { 'fronts/p1':{ name:'CCFA', status:'active', order:1, created:1 }, 'meta/settings':{}, 'meta/focus':{ days:{} } };
+  const W4 = () => [0,1,2,3].map(i => ({ text:`S${i + 1}`, done:false }));
+  // dos objetivos en un congelado: al activarlo los dos reciben fechas y la hoja muestra el que ya tenía fechas
+  let p = await open('light', { ...one, 'fronts/e1':{ name:'eJPT', status:'frozen', order:50, created:4, pauses:[{ from:add(TODAY, -2) }] },
+    'goals/ge':{ frontId:'e1', title:'Obtener la eJPT', start:add(TODAY, -2), deadline:add(TODAY, 25), weekly:W4(), premortem:[], created:1 },
+    'goals/gu':{ frontId:'e1', title:'Laboratorio AD', start:null, deadline:null, weekly:[], premortem:[], created:2 } });
+  await nav(p, 'frentes'); await p.click('.trow [data-act=front-activate]');
+  ok(/Obtener la eJPT/.test(await p.locator('.sheet').textContent()) && /Duración: 4 semanas/.test(await p.locator('.sheet').textContent()), 'la hoja de activar muestra el objetivo que ya tenía fechas y su duración');
+  await p.fill('#g-start', add(MON, 14)); ok(await p.inputValue('#g-deadline') === add(MON, 41) && /Duración: 4 semanas/.test(await p.locator('.sheet').textContent()), 'mover el inicio conserva la duración');
+  await p.fill('#g-start', MON); await p.click('[data-act=activate-go]'); await p.waitForTimeout(100);
+  let gs = Object.fromEntries((await store(p)).goals.map(g => [g.id, g]));
+  ok(gs.ge.start === MON && gs.ge.weekly.length === 4 && gs.ge.weekly[3].text === 'S4' && gs.gu.start === MON && gs.gu.deadline === add(MON, 27), 'los dos objetivos quedan con fechas y no se pierden semanas');
+  await p.close();
+  // con avance: solo el tramo congelado de ahora corre la fecha, y el aviso no dice «empieza hoy»
+  p = await open('light', seedGoal({ start:add(TODAY, -20), days:28, levels:seq(add(TODAY, -20), [2]), frontExtra:{ status:'frozen', pauses:[{ from:add(TODAY, -15), to:add(TODAY, -10) }, { from:add(TODAY, -4) }] } }));
+  await nav(p, 'frentes'); await p.click('.trow [data-act=front-activate]');
+  const sh = await p.locator('.sheet').textContent();
+  ok(await p.inputValue('#g-start') === add(TODAY, -20) && await p.inputValue('#g-deadline') === add(TODAY, 11) && /se corrió 4 días/.test(sh) && /Sigue donde ibas/.test(sh), 'con avance solo corre los días del congelado de ahora');
+  await p.click('[data-act=activate-go]'); ok((await toastText(p)) === 'CCFA activado. Su bosque sigue donde iba.', 'el aviso dice que el bosque sigue'); await p.close();
+  // un objetivo cumplido no revive al activar
+  const doneSeed = seedGoal({ start:add(TODAY, -40), days:28, frontExtra:{ status:'frozen', pauses:[{ from:add(TODAY, -20) }] } });
+  doneSeed['goals/g1'].weekly = doneSeed['goals/g1'].weekly.map(w => ({ ...w, done:true }));
+  p = await open('light', doneSeed);
+  await nav(p, 'frentes'); await p.click('.trow [data-act=front-activate]'); await p.waitForTimeout(80);
+  ok(await p.locator('#modal .sheet').count() === 0 && (await store(p)).fronts[0].status === 'active', 'un objetivo cumplido no pide fechas: Activar es un toque'); await p.close();
+  // asistente: si llenas el hábito y luego pasas a Congelado, el hábito no se crea; el primer paso separa las dos preguntas
+  p = await open('light', one); await nav(p, 'frentes'); await p.click('[data-act=front-new]:not([data-frozen])');
+  ok(/Tipo/.test(await p.locator('.sheet').textContent()) && /¿Empieza ya\?/.test(await p.locator('.sheet').textContent()), 'el primer paso separa «Tipo» y «¿Empieza ya?»');
+  await p.fill('#wz-name', 'THM'); await p.click('[data-act=wz-next]'); await p.click('[data-act=wz-next]'); await p.click('[data-act=wz-skip]'); await p.click('[data-act=wz-habit][data-v="1"]');
+  for (let i = 0; i < 3; i++) await p.click('[data-act=wz-back]');
+  await p.click('[data-act=wz-state][data-v=frozen]'); await p.click('[data-act=wz-next]'); await p.click('[data-act=wz-next]'); await p.click('[data-act=wz-create]'); await p.waitForTimeout(100);
+  const s2 = await store(p); ok(s2.fronts.some(f => f.name === 'THM' && f.status === 'frozen') && !s2.habits.length, 'el hábito de un paso que ya no se muestra no se crea');
+  // formulario: de un frente congelado a uno activo se ve el plan por semanas
+  const thm = s2.fronts.find(f => f.name === 'THM').id; await p.click(`[data-act=front-sheet][data-id="${thm}"]`); await p.click('.sheet [data-act=goal-new]');
+  ok(!(await p.locator('#g-weeks').isVisible()), 'en un congelado el objetivo no muestra semanas');
+  await p.selectOption('#g-front', 'p1'); ok(await p.locator('#g-weeks').isVisible() && await p.locator('#g-start').isVisible(), 'al elegir un frente activo aparecen fechas y semanas');
+  ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
 }
 // ---------- 7. hojas en iPhone ----------
 console.log('\nHojas en iPhone');

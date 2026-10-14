@@ -536,8 +536,11 @@ const habits = () => S.habits.slice().sort(byOrder);
 const goalWeeks = g => (g && g.start && g.deadline && g.deadline >= g.start) ? Math.max(1, Math.min(52, Math.ceil((diffDays(g.start, g.deadline) + 1) / 7))) : 12;
 const pauseFrom = f => { const p = (f.pauses || []).find(x => !x.to); return p ? p.from : f.status !== "active" ? "2000-01-01" : null; }; // día en que se congeló (sin pausas: desde siempre)
 const isFrozen = fid => { const f = front(fid); return !!f && f.status !== "active"; };
-const planGoal = f => { const from = pauseFrom(f) || today(); return S.goals.filter(g => g.frontId === f.id && (!g.deadline || g.deadline >= from)).sort((a,b) => String(a.start||"").localeCompare(String(b.start||"")))[0]; }; // el objetivo que seguía vivo al congelarlo (o el que se creó sin fechas)
-const goalFor = fid => S.goals.filter(g => g.frontId === fid && (!g.deadline || g.deadline >= today())).sort((a,b) => String(a.start||"").localeCompare(String(b.start||"")))[0];
+const goalDone = g => { const N = g.start && g.deadline ? goalWeeks(g) : 0; return N > 0 && (g.weekly || []).slice(0, N).filter(w => w && w.done).length === N; }; // todas sus semanas marcadas («Cumplido»)
+const liveGoals = f => { const p = (f.pauses || []).find(x => !x.to), from = p ? p.from : today(); // los que seguían vivos al congelarlo (o se crearon sin fechas); primero los que tienen fechas
+  return S.goals.filter(g => g.frontId === f.id && (!g.deadline || g.deadline >= from) && !goalDone(g)).sort((a,b) => String(a.start||"9999").localeCompare(String(b.start||"9999"))); };
+const planGoal = f => liveGoals(f)[0];
+const goalFor = fid => S.goals.filter(g => g.frontId === fid && (!g.deadline || g.deadline >= today())).sort((a,b) => String(a.start||"9999").localeCompare(String(b.start||"9999")))[0];
 const scheduled = (h, d) => { const f = h.frontId && front(h.frontId); return !(f && paused(f, d)) && (h.days || []).includes(dow(d)); }; // un día con el frente congelado no toca
 const settings = () => S.settings || {};
 
@@ -1007,7 +1010,7 @@ const HELP = {
   bandeja:["Bandeja", ["Escribe aquí cualquier pendiente o idea apenas se te ocurra, sin organizarlo.", "Marca la casilla si ya lo hiciste.", "Toca <b>Mover</b> para enviarlo a un frente o congelarlo para algún día.", "Déjala vacía cada noche."]],
   frentes:["Frentes", ["Al crear un frente eliges el tipo:", "<b>Proyecto</b>: tareas distintas, como CCFA o THM. Máximo 2 activos; el resto va a Congelados.", "<b>Hábito</b>: lo mismo cada día, como leer 20 minutos. No tiene tareas y no ocupa cupo.", "Y si empieza <b>Activo</b> o <b>Congelado</b>. Congelado no pide fechas ni crea bosque: las eliges al activarlo.", "Debajo del nombre ves su objetivo, lo que toca esta semana y su hábito.", "Escribe tareas concretas que empiecen con un verbo: “Resolver la sala de XSS”.", "Toca <b>⋯</b> en una tarea para ponerla como principal de hoy o de mañana."]],
   habitosf:["Hábitos", ["Lo que haces igual cada día, como leer 20 minutos.", "No tienen tareas: en <b>Hoy</b> tocas <b>▶</b> y al terminar el tiempo se marca solo.", "No ocupan los 2 cupos de proyectos.", "Si le pones un objetivo con fechas, también tiene su bosque.", "Para cambiar el tiempo o los días: <b>⋯</b> → Editar hábito."]],
-  congelados:["Congelados", ["Proyectos e ideas que te interesan pero no son para ahora.", "No se pierden: quedan guardados con sus tareas (las ves en <b>⋯</b>).", "Toca <b>Activar</b> en un frente: si tiene objetivo, ahí eliges sus fechas y desde ese día crece su bosque. Si ya tienes 2 proyectos activos, ahí mismo congelas uno.", "<b>Nuevo</b> crea un frente que empieza congelado.", "<b>Ideas</b>: lo que congelaste desde la Bandeja. <b>Activar</b> la devuelve a la Bandeja; <b>⋯</b> la mueve a un frente."]],
+  congelados:["Congelados", ["Proyectos e ideas que te interesan pero no son para ahora.", "No se pierden: quedan guardados con sus tareas (las ves en <b>⋯</b>).", "Toca <b>Activar</b> en un frente: si tiene objetivo, ahí eliges sus fechas (si ya tenía avance, su bosque sigue). Si ya tienes 2 proyectos activos, ahí mismo congelas uno.", "<b>Nuevo</b> crea un frente que empieza congelado.", "<b>Ideas</b>: lo que congelaste desde la Bandeja. <b>Activar</b> la devuelve a la Bandeja; <b>⋯</b> la mueve a un frente."]],
   metas:["Metas", ["De lo grande a lo pequeño:", "<b>Visión</b>: hacia dónde vas en años.", "<b>Objetivo</b>: lo que logras entre una fecha de inicio y una fecha límite.", "<b>Semanas</b>: lo que debe estar hecho cada domingo.", "Las tareas del día van en Frentes."]],
   vision:["Visión", ["Una o dos frases sobre hacia dónde vas en los próximos años.", "Solo da dirección, no es una tarea."]],
   objetivos:["Objetivos", ["Un resultado medible con fecha límite, como “Aprobar la CCFA”.", "Las semanas salen solas de tus fechas: 4 semanas si pones un mes, 12 si pones tres.", "Si es de un hábito no tiene semanas: avanza por días (Día 5 de 23 · 4 días cumplidos).", "Escribe qué debe estar hecho cada semana y márcalo el domingo.", "En <b>Plan</b> quedan tu mínimo, cuándo lo haces y qué podría salir mal.", "Los de frentes congelados quedan plegados en <b>Congelados</b>, sin fechas ni bosque, hasta que actives el frente.", "El <b>bosque</b> crece con cada día que avanzas en el frente.", "La línea naranja de la barra marca el tiempo que ha pasado."]],
@@ -1106,7 +1109,7 @@ function frontSheet(id){
       ${isHabitFront(f) ? `<button class="opt" data-act="front-kind" data-id="${id}" data-v="project"><span class="grow">Convertir en proyecto<small>Para un frente con tareas distintas.</small></span></button>`
                         : `<button class="opt" data-act="front-kind" data-id="${id}" data-v="habit"><span class="grow">Convertir en hábito<small>Lo mismo cada día, sin tareas. No ocupa cupo.</small></span></button>`}
       ${f.status === "active" ? `<button class="opt" data-act="front-freeze" data-id="${id}"><span class="grow">Congelar<small>Sale de los activos. Sus tareas quedan guardadas.</small></span></button>`
-                               : `<button class="opt" data-act="front-activate" data-id="${id}"><span class="grow">Activar<small>${planGoal(f) ? "Eliges cuándo empieza su objetivo." : isHabitFront(f) ? "Vuelve a Hoy." : "Pasa a tus proyectos activos."}</small></span></button>`}
+                               : `<button class="opt" data-act="front-activate" data-id="${id}"><span class="grow">Activar<small>${planGoal(f) ? "Eliges las fechas de su objetivo." : isHabitFront(f) ? "Vuelve a Hoy." : "Pasa a tus proyectos activos."}</small></span></button>`}
       <button class="opt danger" data-act="front-del" data-id="${id}"><span class="grow">${del ? "Toca otra vez: se borran sus tareas pendientes, objetivo y hábito" : "Borrar frente"}<small>${del ? "Si solo quieres pausarlo, mejor congélalo." : ""}</small></span></button>`);
   });
 }
@@ -1122,15 +1125,17 @@ function actDates(f, g){ // fechas al activar: sin avance empiezas de nuevo con 
   const dated = g.start && g.deadline, len = dated ? diffDays(g.start, g.deadline) : (hk ? 20 : 27);
   const lvl = dated ? forestMap(g) : {}, prog = dated && ((g.weekly || []).some(w => w && w.done) || Object.keys(lvl).some(d => d >= g.start && d <= g.deadline));
   if (!prog) return {start:st0, deadline:addDays(st0, len), shift:0};
-  let shift = 0; for (let d = g.start; d < t; d = addDays(d, 1)) if (paused(f, d)) shift++;
+  const p0 = pauseFrom(f) || t; let shift = 0; for (let d = p0 > g.start ? p0 : g.start; d < t; d = addDays(d, 1)) if (paused(f, d)) shift++; // solo el tramo que se cierra ahora
   return {start:g.start, deadline:addDays(g.deadline, shift), shift};
 }
+const durTxt = (hk, s, e) => hk ? plural(diffDays(s, e) + 1, "día", "días") : plural(goalWeeks({start:s, deadline:e}), "semana", "semanas");
 function activateSheet(id){
   openModal(() => {
     const f = front(id); if (!f) return "";
     const g = planGoal(f), full = !isHabitFront(f) && projects().length >= 2, d = g ? actDates(f, g) : null;
     return sheet(`Activar ${esc(f.name)}`, `${g ? `<p style="font-weight:700">${esc(g.title)}</p>
-      <p class="muted" style="font-size:13px">¿Cuándo empiezas? Desde ese día crece su bosque.</p>${datesFields(d.start, d.deadline)}
+      <p class="muted" style="font-size:13px">${d.start < today() ? "Sigue donde ibas: su bosque conserva lo que ya creció." : "¿Cuándo empiezas? Desde ese día crece su bosque."}</p>${datesFields(d.start, d.deadline)}
+      <p class="muted" id="g-dur" data-len="${diffDays(d.start, d.deadline)}" data-hk="${isHabitFront(f) ? 1 : ""}" style="font-size:13px">Duración: <b style="color:var(--ink)">${durTxt(isHabitFront(f), d.start, d.deadline)}</b></p>
       ${d.shift ? `<p class="tmeta">La fecha límite se corrió ${plural(d.shift, "día", "días")} por el tiempo congelado.</p>` : ""}` : ""}
       ${full ? `<div class="group-label">Ya tienes 2 proyectos activos. Congela uno:</div>${projects().map(p => `<button class="opt" data-act="activate-go" data-id="${id}" data-out="${p.id}"><span class="grow">Congelar ${esc(p.name)}<small>y activar ${esc(f.name)}</small></span></button>`).join("")}`
              : `<button class="btn primary block" data-act="activate-go" data-id="${id}">Activar</button>`}`);
@@ -1437,9 +1442,9 @@ function wizardRender(){
   let body = "";
   if (cur === "front") body = `<h3 class="wz-q">¿En qué vas a trabajar?</h3>
     <label class="field" for="wz-name">Nombre<input type="text" id="wz-name" value="${nm}" placeholder="${hk ? "Ej: Leer Dune" : "Ej: THM Web"}" autocomplete="off" autofocus></label>
-    <div class="stack"><button class="opt ${hk ? "" : "sel"}" data-act="wz-kind" data-v="project"><span class="grow">Proyecto<small>Tareas distintas, como CCFA o THM</small></span></button>
+    <div class="stack"><div class="group-label">Tipo</div><button class="opt ${hk ? "" : "sel"}" data-act="wz-kind" data-v="project"><span class="grow">Proyecto<small>Tareas distintas, como CCFA o THM</small></span></button>
       <button class="opt ${hk ? "sel" : ""}" data-act="wz-kind" data-v="habit"><span class="grow">Hábito<small>Lo mismo cada día, como leer 20 minutos</small></span></button></div>
-    <div class="stack"><button class="opt ${fz ? "" : "sel"}" data-act="wz-state" data-v="active" ${full ? "disabled" : ""}><span class="grow">Activo<small>${full ? "Ya tienes 2 proyectos activos" : "Empiezas ya"}</small></span></button>
+    <div class="stack"><div class="group-label">¿Empieza ya?</div><button class="opt ${fz ? "" : "sel"}" data-act="wz-state" data-v="active" ${full ? "disabled" : ""}><span class="grow">Activo<small>${full ? "Ya tienes 2 proyectos activos" : "Empiezas ya"}</small></span></button>
       <button class="opt ${fz ? "sel" : ""}" data-act="wz-state" data-v="frozen"><span class="grow">Congelado<small>Para después: sin fechas ni bosque hasta que lo actives</small></span></button></div>
     ${hk ? "" : `<label class="field" for="wz-note">Nota<span class="hint">Opcional. Ej: retomar cuando pase la CCFA.</span><input type="text" id="wz-note" value="${esc(W.note)}" autocomplete="off"></label>`}
     <div class="wz-nav"><span></span>${next}</div>`;
@@ -1474,11 +1479,11 @@ function wizardRender(){
   return sheet(hk ? "Nuevo hábito" : "Nuevo frente", top + body);
 }
 function wizardCreate(){
-  const hk = W.kind === "habit", fid = "f" + uid(), isAct = !wzFrozen(), now = Date.now();
+  const hk = W.kind === "habit", fid = "f" + uid(), isAct = !wzFrozen(), now = Date.now(), withHabit = W.wantHabit && wzFlow().includes("habit"); // si pasaste a Congelado, el hábito que llenaste antes no se crea
   put("fronts", {id:fid, name:W.name, note:hk ? "" : W.note, status:isAct ? "active" : "frozen", order:isAct ? active().length + 1 : 50, created:now, pauses:isAct ? [] : [{from:today()}], ...(hk ? {kind:"habit"} : {})});
   W.tasks.forEach((t, i) => put("tasks", {id:"t" + uid() + i, title:t.title, frontId:fid, minutes:t.minutes, slot:null, date:null, done:false, created:now + i}));
-  if (W.goal.title){ const {frontId, ...g} = W.goal; put("goals", {id:"g" + uid(), ...g, ...(W.wantHabit && !hk ? {minimum:"", standard:""} : {}), ...(isAct ? {} : {start:null, deadline:null, weekly:[]}), frontId:fid, created:now}); } // congelado: las fechas se eligen al activarlo
-  if (W.wantHabit){ const {frontId, ...h} = W.habit; put("habits", {id:"h" + uid(), ...h, name:h.name || W.name, frontId:fid, log:{}, order:S.habits.length + 1, created:today()}); }
+  if (W.goal.title){ const {frontId, ...g} = W.goal; put("goals", {id:"g" + uid(), ...g, ...(withHabit && !hk ? {minimum:"", standard:""} : {}), ...(isAct ? {} : {start:null, deadline:null, weekly:[]}), frontId:fid, created:now}); } // congelado: las fechas se eligen al activarlo
+  if (withHabit){ const {frontId, ...h} = W.habit; put("habits", {id:"h" + uid(), ...h, name:h.name || W.name, frontId:fid, log:{}, order:S.habits.length + 1, created:today()}); }
   const toHoy = hk && isAct && (W.habit.days || []).includes(dow(today())), next = toHoy ? "hoy" : "frentes";
   closeModal(); if (view !== next){ view = next; try { localStorage.setItem("ej-view", view); } catch(e){} }
   sched(); toast(toHoy ? `${W.name} listo. Está en Hoy${W.habit.minutes ? ": toca ▶ para empezar" : ""}.` : isAct ? `${W.name} listo.` : `${W.name} creado en Congelados.${W.goal.title ? " Las fechas las eliges al activarlo." : ""}`);
@@ -1689,7 +1694,7 @@ const A = {
   "wz-task-del"(d){ W.tasks.splice(+d.i, 1); wzRedraw(); },
   "wz-habit"(d){ wzCapture(); W.wantHabit = d.v === "1"; if (W.wantHabit && !W.habit.name) W.habit.name = W.name;
     if (W.wantHabit){ W.habit.minimum = W.habit.minimum || W.goal.minimum || ""; W.habit.standard = W.habit.standard || W.goal.standard || ""; } wzRedraw(); },
-  "wz-create"(){ wzCapture(); if (wzCur() === "goal" && !wzGoalOk()) return; if (W.wantHabit && !W.habit.days.length){ toast("Elige al menos un día para el hábito."); return; } wizardCreate(); },
+  "wz-create"(){ wzCapture(); if (wzCur() === "goal" && !wzGoalOk()) return; if (W.wantHabit && wzFlow().includes("habit") && !W.habit.days.length){ toast("Elige al menos un día para el hábito."); return; } wizardCreate(); },
   "habit-quick"(d){ habitQuick(d.front); },
   "front-freeze"(d){ const f = front(d.id); if (!f) return; const msg = freezeFront(f); closeModal(); toast(msg); },
   "front-activate"(d){ const f = front(d.id); if (!f) return; // con objetivo, o sin cupo, se abre la hoja para elegir fechas o hacer espacio
@@ -1700,10 +1705,14 @@ const A = {
     if (g && (!start || !deadline)){ toast("Pon la fecha de inicio y la fecha límite."); return; }
     if (g && deadline < start){ toast("La fecha límite debe ser después del inicio."); return; }
     if (!out && !isHabitFront(f) && projects().length >= 2){ toast("Ya tienes 2 proyectos activos. Congela uno primero."); return; }
+    const rest = liveGoals(f).filter(x => x !== g).map(x => ({...x, ...actDates(f, x)})); // si tenía otro objetivo vivo, también recibe fechas (antes de activar: se calculan con su pausa)
+    const wk = (x, a, b) => Array.from({length:goalWeeks({start:a, deadline:b})}, (_, i) => (x.weekly || [])[i] || {text:"", done:false});
     const pre = out ? freezeFront(out) + " " : "";
     activateFront(f);
-    if (g) put("goals", {...g, start, deadline, weekly:Array.from({length:goalWeeks({start, deadline})}, (_, i) => (g.weekly || [])[i] || {text:"", done:false})});
-    closeModal(); toast(pre + `${f.name} activado.` + (g ? (start > today() ? ` Su bosque empieza el ${fmtShort(start)}.` : " Su bosque empieza hoy.") : "")); },
+    if (g) put("goals", {...g, start, deadline, weekly:wk(g, start, deadline)});
+    rest.forEach(({shift, ...x}) => put("goals", {...x, weekly:wk(x, x.start, x.deadline)}));
+    const t = today(), fm = !g ? "" : start > t ? ` Su bosque empieza el ${fmtShort(start)}.` : start === t ? " Su bosque empieza hoy." : " Su bosque sigue donde iba.";
+    closeModal(); toast(pre + `${f.name} activado.` + fm); },
   "front-del"(d){ if (confirmTap("fdel-" + d.id)){ S.tasks.filter(t => t.frontId === d.id).forEach(t => t.done ? put("tasks", {...t, frontId:null, archived:true}) : remove("tasks", t.id)); S.goals.filter(g => g.frontId === d.id).forEach(g => remove("goals", g.id)); S.habits.filter(h => h.frontId === d.id).forEach(h => remove("habits", h.id)); remove("fronts", d.id); closeModal(); toast("Frente borrado."); } },
   "goal-new"(d){ goalForm(null, null, d && d.front); },
   "goal-sheet"(d){ confirmKey = null; goalSheet(d.id); },
@@ -1787,8 +1796,11 @@ document.addEventListener("change", e => {
   if (e.target.id === "g-front" && $("#g-stdmin")){ const box = $("#g-stdmin"); // cambiar de frente no borra lo escrito
     if ($("#g-standard")){ box.dataset.std = $("#g-standard").value; box.dataset.min = $("#g-minimum").value; }
     box.innerHTML = stdMinHtml(e.target.value, {standard:box.dataset.std, minimum:box.dataset.min}); growAll(); }
-  if (e.target.id === "g-front" && $("#g-dates")){ const off = isFrozen(e.target.value); $("#g-dates").hidden = off; if ($("#g-weeks-box")) $("#g-weeks-box").hidden = off; }
+  if (e.target.id === "g-front" && $("#g-dates")){ const off = isFrozen(e.target.value), wb = $("#g-weeks-box"); $("#g-dates").hidden = off; if (wb){ wb.hidden = off; const dt = wb.closest("details"); if (dt && !off) dt.open = true; } } // a un frente activo: se ve el plan por semanas
   if (e.target.matches("[data-htime]")){ const box = e.target.closest(".hf"); if (box) box.dataset.timed = e.target.value ? "1" : "0"; }
+  if (e.target.matches("#g-start,#g-deadline") && $("#g-dur")){ const L = $("#g-dur"), st = $("#g-start").value; // al activar, mover el inicio conserva la duración
+    if (e.target.id === "g-start" && st) $("#g-deadline").value = addDays(st, +L.dataset.len);
+    const dl = $("#g-deadline").value; if (st && dl >= st){ L.dataset.len = diffDays(st, dl); L.querySelector("b").textContent = durTxt(!!L.dataset.hk, st, dl); } }
   if (e.target.matches("#g-start,#g-deadline")){
     const st = $("#g-start").value, dl = $("#g-deadline").value, box = $("#g-weeks"); if (!box || !st || !dl) return;
     if (dl < st){ toast("La fecha límite debe ser después del inicio."); return; }
