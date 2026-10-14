@@ -146,11 +146,15 @@ for (const scheme of ['light', 'dark']){
   // frente congelado hace 6 días: esos días no cuentan
   start = add(TODAY, -12);
   p = await open(scheme, seedGoal({ start, days:28, levels:seq(start, [2,2,2,2,2,2]), frontExtra:{ status:'frozen', pauses:[{ from:add(TODAY, -6) }] } }));
-  await nav(p, 'metas'); lb = await p.locator('.forest .forest-count').textContent();
-  ok(!/marchito|seco/.test(lb), `${scheme}: con el frente congelado no se marchita nada ("${lb}")`);
-  // y al activarlo se cierra la pausa
-  await nav(p, 'frentes'); await p.click('[data-act=front-activate]'); await p.waitForTimeout(80);
+  await nav(p, 'metas');
+  ok(await p.locator('.forest').count() === 0 && /Congelados \(1\)/.test(await p.locator('#view').textContent()), `${scheme}: un objetivo congelado va plegado en Congelados, sin bosque`);
+  // al activarlo se cierra la pausa, la fecha límite se corre lo congelado y no se marchita nada
+  await nav(p, 'frentes'); await p.click('[data-act=front-activate]');
+  ok(await p.inputValue('#g-start') === start && await p.inputValue('#g-deadline') === add(start, 27 + 6) && /se corrió 6 días/.test(await p.locator('.sheet').textContent()), `${scheme}: con avance, la hoja de activar corre la fecha límite 6 días`);
+  await p.click('[data-act=activate-go]'); await p.waitForTimeout(80);
   const fr = (await store(p)).fronts[0]; ok(fr.status === 'active' && fr.pauses[0].to === TODAY, `${scheme}: activar cierra la pausa`);
+  await nav(p, 'metas'); lb = await p.locator('.forest .forest-count').textContent();
+  ok(!/marchito|seco/.test(lb), `${scheme}: los días congelados no marchitan nada ("${lb}")`);
   await p.close();
 }
 // ---------- 4. arreglos de la revisión ----------
@@ -187,7 +191,7 @@ for (const scheme of ['light', 'dark']){
   // frente congelado con la versión anterior (sin pauses): al activarlo no aparecen fallos
   { const start = add(TODAY, -12);
     const p = await open(scheme, seedGoal({ start, days:28, levels:seq(start, [2,2,2,2]), frontExtra:{ status:'frozen' } }));
-    await nav(p, 'frentes'); await p.click('[data-act=front-activate]'); await p.waitForTimeout(80); await nav(p, 'metas');
+    await nav(p, 'frentes'); await p.click('[data-act=front-activate]'); await p.click('[data-act=activate-go]'); await p.waitForTimeout(80); await nav(p, 'metas');
     const lb = await p.locator('.forest-count').textContent(); ok(!/marchito|seco/.test(lb), `${scheme}: activar un frente congelado antiguo no llena de fallos ("${lb}")`); await p.close(); }
   // objetivo de más de 364 días: se ve el bloque que contiene hoy
   { const start = add(TODAY, -400), p = await open(scheme, seedGoal({ start, days:520, deadline:add(TODAY, 120), levels:seq(add(TODAY, -3), [2,2,2]) }));
@@ -497,7 +501,7 @@ console.log('\nCongelar y activar');
   ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
   // al activar un frente congelado: sin falsa alarma, los días congelados no se pintan de rojo y no hay árbol que salvar
   p = await open('light', seedGoal({ start:add(TODAY, -10), days:28, levels:seq(add(TODAY, -10), [2,2,2,2,2]), frontExtra:{ status:'frozen', pauses:[{ from:add(TODAY, -4) }] } }));
-  await nav(p, 'frentes'); await p.click('[data-act=front-activate]'); await p.waitForTimeout(80); await nav(p, 'hoy');
+  await nav(p, 'frentes'); await p.click('[data-act=front-activate]'); await p.click('[data-act=activate-go]'); await p.waitForTimeout(80); await nav(p, 'hoy');
   const nts = await p.locator('.notices').textContent().catch(() => '');
   ok(!/sin cumplir|La última vez|marchitando/.test(nts), `al activar no hay falsa alarma ni árbol que salvar ("${nts.trim()}")`);
   ok(await dotCls(p, 0) !== 'miss' && await dotCls(p, 1) !== 'miss' && await dotCls(p, 2) !== 'miss', 'los días congelados no salen en rojo');
@@ -525,7 +529,7 @@ console.log('\nCongelar y activar');
   await nav(p, 'metas'); ok(await p.locator('.forest .today').count() === 0, 'el bosque de un frente congelado no marca hoy'); await p.close();
   p = await open('light', seedGoal({ start:add(TODAY, -40), days:28 })); await nav(p, 'metas');
   ok(/Plazo vencido/.test(await p.locator('.goal').textContent()) && await p.locator('.goal .trow.cur').count() === 0 && !/esta semana/.test(await p.locator('.goal').textContent()), 'un objetivo vencido no marca «esta semana»');
-  await nav(p, 'frentes'); await p.click('[data-act=help][data-k=congelados]'); ok(/menos de 2 proyectos activos/.test(await p.locator('.sheet').textContent()), 'la ayuda de Congelados habla de proyectos');
+  await nav(p, 'frentes'); await p.click('[data-act=help][data-k=congelados]'); ok(/2 proyectos activos/.test(await p.locator('.sheet').textContent()) && !/2 frentes activos/.test(await p.locator('.sheet').textContent()), 'la ayuda de Congelados habla de proyectos');
   ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
 }
 // ---------- 6c. ideas congeladas desde la Bandeja (Tarea 9) ----------
@@ -571,6 +575,83 @@ for (const scheme of ['light', 'dark']){
   await p.click('[data-act=settings]'); await p.click('[data-act=backup]'); await p.waitForTimeout(150);
   const data = JSON.parse((await p.evaluate(() => window.__saved)).data).data;
   ok(data.tasks.some(x => x.id === 'n1' && x.someday === TODAY), 'la copia guarda la idea congelada'); await p.close();
+}
+// ---------- 6d. frentes congelados sin fechas (Tarea 10) ----------
+console.log('\nFrentes congelados sin fechas');
+const MON = '2026-10-12'; // TODAY es jueves: el próximo lunes
+for (const scheme of ['light', 'dark']){
+  // crear un proyecto congelado con cupo libre: sin fechas, sin hábito, sin bosque
+  const one = { 'fronts/p1':{ name:'CCFA', status:'active', order:1, created:1 }, 'meta/settings':{}, 'meta/focus':{ days:{} } };
+  let p = await open(scheme, one);
+  await nav(p, 'frentes'); await p.click('[data-act=front-new]:not([data-frozen])'); await p.fill('#wz-name', 'eJPT');
+  ok(await p.locator('[data-act=wz-state][data-v=active].sel').count() === 1, `${scheme}: con cupo libre, el asistente empieza en Activo`);
+  await p.click('[data-act=wz-state][data-v=frozen]'); await p.click('[data-act=wz-next]');
+  await p.fill('#wz-task', 'Repasar Nmap'); await p.press('#wz-task', 'Enter'); await p.click('[data-act=wz-next]');
+  ok(/Paso 3 de 3/.test(await p.locator('.sheet').textContent()) && !(await p.locator('#g-start').isVisible()) && !(await p.locator('#g-weeks').isVisible()), `${scheme}: congelado: 3 pasos y el objetivo no pide fechas ni semanas`);
+  await p.screenshot({ path:path.join(out, `congelado-objetivo-${scheme}.png`) });
+  await p.fill('#g-title', 'Obtener la eJPT'); await p.fill('#g-why', 'Crecimiento personal'); await p.click('[data-act=wz-create]'); const tt = await toastText(p); await p.waitForTimeout(100);
+  let s = await store(p), f = s.fronts.find(x => x.name === 'eJPT'), g = s.goals.find(x => x.frontId === f.id);
+  ok(f.status === 'frozen' && f.pauses[0].from === TODAY && !s.habits.length && g.start === null && g.deadline === null && !g.weekly.length && g.why === 'Crecimiento personal', `${scheme}: queda congelado, sin hábito y con el objetivo sin fechas`);
+  ok(tt === 'eJPT creado en Congelados. Las fechas las eliges al activarlo.', `${scheme}: el aviso explica cuándo se eligen las fechas ("${tt}")`);
+  ok(/Obtener la eJPT/.test(await p.locator('.trow:has-text("eJPT") .tmeta').textContent()), `${scheme}: la fila de Congelados dice su objetivo`);
+  await nav(p, 'metas');
+  ok(await p.locator('.forest').count() === 0 && /Congelados \(1\)/.test(await p.locator('#view').textContent()) && !/semana/i.test(await p.locator('details[data-keep=metas-cold]').textContent()), `${scheme}: en Metas va plegado en Congelados, sin bosque ni semanas`);
+  await p.click('details[data-keep=metas-cold] summary'); ok(/eJPT·Congelado desde el 8 (de )?oct/.test(await p.locator('details[data-keep=metas-cold] .tmeta').textContent()), `${scheme}: dice desde cuándo está congelado`);
+  await p.screenshot({ path:path.join(out, `metas-congelados-${scheme}.png`), fullPage:true });
+  // editarlo congelado sigue sin pedir fechas
+  await p.click('details[data-keep=metas-cold] [data-act=goal-sheet]'); await p.click('[data-act=goal-edit]');
+  ok(!(await p.locator('#g-start').isVisible()), `${scheme}: editar el objetivo congelado no pide fechas`);
+  await p.fill('#g-title', 'Obtener la eJPT este año'); await p.click('.sheet [type=submit]'); await p.waitForTimeout(80);
+  g = (await store(p)).goals.find(x => x.frontId === f.id); ok(g.title === 'Obtener la eJPT este año' && g.start === null, `${scheme}: se guarda sin fechas`);
+  // la hoja del frente congelado muestra sus tareas
+  await nav(p, 'frentes'); await p.click(`[data-act=front-sheet][data-id="${f.id}"]`);
+  ok(/Tareas\s*Repasar Nmap/.test(await p.locator('.sheet').textContent()) && /Eliges cuándo empieza su objetivo/.test(await p.locator('.sheet').textContent()), `${scheme}: ⋯ de un congelado muestra sus tareas`);
+  await p.click('[data-act=close]');
+  // activar: la hoja pide las fechas (próximo lunes + 4 semanas) y desde ahí empieza el bosque
+  await p.click(`.trow [data-act=front-activate][data-id="${f.id}"]`);
+  ok(await p.inputValue('#g-start') === MON && await p.inputValue('#g-deadline') === add(MON, 27), `${scheme}: al activar propone el próximo lunes y 4 semanas`);
+  await p.screenshot({ path:path.join(out, `activar-${scheme}.png`) });
+  await p.click('[data-act=activate-go]'); const ta = await toastText(p); await p.waitForTimeout(100);
+  s = await store(p); f = s.fronts.find(x => x.id === f.id); g = s.goals.find(x => x.frontId === f.id);
+  ok(f.status === 'active' && f.pauses[0].to === TODAY && g.start === MON && g.deadline === add(MON, 27) && g.weekly.length === 4, `${scheme}: queda activo con fechas y 4 semanas`);
+  ok(/^eJPT activado\. Su bosque empieza el 12 (de )?oct\.$/.test(ta), `${scheme}: el aviso dice cuándo empieza ("${ta}")`);
+  await nav(p, 'metas'); ok(await p.locator('.forest').count() === 1 && /Empieza el 12 (de )?oct/.test(await p.locator('#view').textContent()), `${scheme}: en Metas ya tiene su bosque`);
+  ok(!p.errs.length && await noScroll(p) === 390, `${scheme}: sin errores ni scroll ` + p.errs.join('|')); await p.close();
+}
+{ // con 2 proyectos activos: el asistente queda en Congelado y activar deja congelar uno ahí mismo
+  const seed = { ...base2(), 'fronts/e1':{ name:'eJPT', status:'frozen', order:50, created:4, pauses:[{ from:add(TODAY, -2) }] },
+    'goals/ge':{ frontId:'e1', title:'Obtener la eJPT', start:add(TODAY, -2), deadline:add(TODAY, 25), weekly:[{ text:'', done:false }, { text:'', done:false }, { text:'', done:false }, { text:'', done:false }], premortem:[], created:1 } };
+  let p = await open('light', seed);
+  await nav(p, 'frentes'); ok(await p.locator('[data-act=front-new][data-frozen="1"]').count() === 1, 'Congelados siempre tiene «Nuevo»');
+  await p.click('[data-act=front-new][data-frozen="1"]');
+  ok(await p.locator('[data-act=wz-state][data-v=active][disabled]').count() === 1 && await p.locator('[data-act=wz-state][data-v=frozen].sel').count() === 1 && /Ya tienes 2 proyectos activos/.test(await p.locator('.sheet').textContent()), 'con 2 proyectos activos, Activo está apagado y queda Congelado');
+  await p.click('[data-act=close]');
+  // eJPT (fechas sin avance, como el de tus datos): en Metas va en Congelados y al activarlo empieza de nuevo con la misma duración
+  await nav(p, 'metas'); ok(await p.locator('.forest').count() === 0 && /Congelados \(1\)/.test(await p.locator('#view').textContent()), 'un objetivo con fechas de un frente congelado también va en Congelados');
+  await nav(p, 'frentes'); await p.click('.trow [data-act=front-activate]');
+  const sh = await p.locator('.sheet').textContent();
+  ok(await p.inputValue('#g-start') === MON && await p.inputValue('#g-deadline') === add(MON, 27) && !/se corrió/.test(sh), 'sin avance, activar empieza de nuevo con la misma duración');
+  ok(/Ya tienes 2 proyectos activos\. Congela uno:/.test(sh) && await p.locator('[data-act=activate-go][data-out]').count() === 2 && await p.locator('.sheet .btn.primary[data-act=activate-go]').count() === 0, 'sin cupo, la hoja ofrece congelar uno de los activos');
+  await p.click('[data-act=activate-go][data-out=p2]'); const tt = await toastText(p); await p.waitForTimeout(100);
+  const s = await store(p), st = id => s.fronts.find(x => x.id === id).status;
+  ok(st('p2') === 'frozen' && st('e1') === 'active' && st('p1') === 'active' && s.goals.find(x => x.id === 'ge').start === MON, 'congela THM, activa eJPT y le pone sus fechas');
+  ok(/^THM congelado\. eJPT activado\. Su bosque empieza el 12 (de )?oct\.$/.test(tt), `el aviso dice las dos cosas ("${tt}")`);
+  ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
+  // un congelado sin objetivo y con cupo se activa con un toque, como antes
+  p = await open('light', { ...seed, 'fronts/p2':{ ...seed['fronts/p2'], status:'frozen', pauses:[{ from:add(TODAY, -1) }] } });
+  await nav(p, 'frentes'); await p.click('.trow [data-act=front-activate][data-id=p2]'); await p.waitForTimeout(80);
+  ok((await store(p)).fronts.find(x => x.id === 'p2').status === 'active' && await p.locator('#modal .sheet').count() === 0, 'sin objetivo, Activar sigue siendo un toque');
+  // en «Nuevo objetivo», elegir un frente congelado oculta las fechas
+  await nav(p, 'metas'); await p.click('[data-act=goal-new]');
+  ok(await p.locator('#g-start').isVisible(), 'con un frente activo se piden fechas');
+  await p.selectOption('#g-front', 'e1'); ok(!(await p.locator('#g-start').isVisible()) && !(await p.locator('#g-weeks').isVisible()), 'al elegir un frente congelado se ocultan fechas y semanas');
+  await p.selectOption('#g-front', 'p1'); ok(await p.locator('#g-start').isVisible(), 'y vuelven al elegir uno activo'); await p.close();
+  // hábito congelado desde el asistente: no sale en Hoy ni pide fechas
+  p = await open('light', base2()); await nav(p, 'frentes'); await p.click('[data-act=front-new][data-kind=habit]'); await p.fill('#wz-name', 'Guitarra');
+  await p.click('[data-act=wz-state][data-v=frozen]'); await p.click('[data-act=wz-next]'); await p.click('[data-act=wz-next]');
+  ok(!(await p.locator('#g-start').isVisible()), 'un hábito congelado no pide fechas para su meta'); await p.click('[data-act=wz-skip]'); await p.waitForTimeout(100);
+  const gf = (await store(p)).fronts.find(x => x.name === 'Guitarra'); ok(gf.status === 'frozen' && gf.kind === 'habit', 'el hábito queda congelado');
+  await nav(p, 'hoy'); ok(!/Guitarra/.test(await p.locator('#view').textContent()), 'y no sale en Hoy'); ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
 }
 // ---------- 7. hojas en iPhone ----------
 console.log('\nHojas en iPhone');

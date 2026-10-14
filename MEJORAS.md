@@ -43,7 +43,7 @@ Cada fase termina con la app publicada y usable. No se empieza una fase sin cerr
 3. **Mínimo innegociable:** en un día malo, cumplir el mínimo mantiene la racha. Regla: *nunca fallar dos veces seguidas*.
 4. **Se decide la noche anterior y de día solo se ejecuta.**
 5. **Interfaz minimalista:** casillas, recuadros punteados con "+" para lo vacío y un botón **"!"** de ayuda en cada apartado (objeto `HELP`). Pocas palabras en pantalla.
-6. **Todo queda ligado al frente:** el asistente "Crear frente" pregunta primero el tipo. Un proyecto lleva por Frente → Tareas → Objetivo → Hábito (objetivo y hábito opcionales). Un hábito lleva por Frente → Tiempo al día → Meta con fecha (opcional).
+6. **Todo queda ligado al frente:** el asistente "Crear frente" pregunta primero el tipo y si empieza **Activo** o **Congelado**. Un proyecto lleva por Frente → Tareas → Objetivo → Hábito (objetivo y hábito opcionales). Un hábito lleva por Frente → Tiempo al día → Meta con fecha (opcional). Congelado no pide fechas ni hábito de proyecto y no crea bosque: las fechas se eligen al activarlo.
 7. **Los formularios se comparten:** el asistente y cada módulo usan exactamente el mismo formulario (`goalFields`/`readGoalFields` y `habitFields`/`readHabitFields`). Si agregas un campo, agrégalo ahí y aparecerá en los dos lugares.
 
 ### Cinco secciones (barra inferior)
@@ -67,7 +67,7 @@ tasks/{id}    { title, frontId|null, minutes|null, slot: null|"critical"|"second
                 date: "YYYY-MM-DD"|null, done, doneAt, created, archived?,
                 missed?: ["YYYY-MM-DD"],                       // días en que fue la Principal y no se hizo (se guarda al moverla o quitarla)
                 someday?: "YYYY-MM-DD" }                       // idea congelada desde la Bandeja (sin frente ni plan); sale de inbox() y va a ideas()
-goals/{id}    { frontId, title, why, start, deadline, standard, minimum, trigger,
+goals/{id}    { frontId, title, why, start, deadline, standard, minimum, trigger,   // start/deadline: null si se creó con el frente congelado (se ponen al activarlo)
                 weekly: [{text, done}],         // largo = goalWeeks(g), sale de las fechas
                 premortem: [{cause, counter}×3], rewardMid, rewardEnd, created }
 habits/{id}   { name, minimum, standard, days: [0-6], frontId|null,
@@ -238,7 +238,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 
 **Hecho:** `ideas()`, acciones `idea-freeze` y `idea-back`; `move` quita `someday`. El aviso dice dónde quedó: «Congelada. La ves en Frentes → Congelados.». El grupo «Ideas (N)» va plegado al final de Congelados (la idea más reciente arriba, con «Desde el …») y recuerda si lo abriste (`KEEP` + `<details data-keep>`). Cubierto por `tests/run.mjs` («Ideas congeladas»).
 
-### Tarea 10: Frentes congelados sin fechas; las fechas al activar *(fase 2 · adelantada)*
+### Tarea 10: Frentes congelados sin fechas; las fechas al activar *(fase 2 · hecha, falta publicar)*
 
 **Problema:** «Debería poder decir si va a estar activa o congelada… que no se cree para esa un bosque ni pida fecha de inicio y fin hasta que la quiera activar». El asistente crea el frente activo si hay cupo y siempre pide fechas; eJPT quedó del 12 oct al 8 nov y su plazo corre aunque esté congelado.
 
@@ -251,6 +251,15 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 - Ayuda, guía y sección 1 (flujo del asistente, modelo de datos).
 
 **Listo cuando:** se puede crear un frente congelado sin fechas ni bosque, activarlo después eligiendo las fechas en ese momento, y eJPT se arregla al activarlo.
+
+**Hecho:**
+- Asistente: `W.frozen`, `wzFrozen()` (también si ya hay 2 proyectos activos: «Activo» queda apagado) y `wzFlow()` (proyecto congelado: Frente → Tareas → Objetivo). «Nuevo» de Congelados abre en Congelado (`data-frozen`).
+- `goalFields(g, {noDates})` (por defecto, si el frente está congelado) oculta `#g-dates` y `#g-weeks-box`, deja visibles qué y por qué y pliega lo demás; `datesFields()` es el bloque de fechas compartido con la hoja de activar. `readGoalFields` conserva las fechas que tuviera si están ocultas y `FORMS.goal` solo las exige si se ven. Cambiar de frente en el formulario las muestra u oculta.
+- `pauseFrom(f)`, `isFrozen(fid)`, `planGoal(f)` (el objetivo que seguía vivo al congelarlo, o el creado sin fechas).
+- «Activar» (`front-activate`): sin objetivo y con cupo, un toque. Si no, `activateSheet()` con las fechas de `actDates()`: sin avance, desde el próximo lunes (hoy en un hábito) con la misma duración; con avance, el mismo inicio y la fecha límite corrida los días congelados («se corrió N días»). Sin cupo, «Congelar X y activar Y» (`activate-go` con `data-out`). Las semanas se ajustan a las fechas nuevas. `freezeFront`/`activateFront` son las mismas que usan Congelar y Activar.
+- Metas: los objetivos de frentes congelados van plegados en «Congelados (N)» (`data-keep="metas-cold"`) con «Congelado desde el …». Un objetivo sin fechas en un frente activo dice «Sin fechas · ponlas en ⋯ → Editar» y no inventa semanas (tampoco en Frentes ni en Semana).
+- Frentes: la fila de un congelado dice su objetivo y su ⋯ muestra sus tareas con «Mover».
+- Cubierto por `tests/run.mjs` («Frentes congelados sin fechas»).
 
 ### Tarea 4: IA dentro de la app *(media)*
 
