@@ -486,6 +486,48 @@ console.log('\nCopia de seguridad');
   await p.goto('file://' + page); await p.waitForSelector('.sec-head'); await p.click('[data-act=settings]');
   ok(await p.locator('[data-act=backup]').count() === 0 && await p.locator('label[for=restore-file]').count() === 1, 'sin descargas se oculta el botón y queda restaurar'); await p.close();
 }
+// ---------- 6b. congelar y activar (Tarea 8) ----------
+console.log('\nCongelar y activar');
+{ const dotCls = (p, i) => p.locator('.dot i').nth(i).getAttribute('class'); // TODAY es jueves: L=0 … J=3
+  // congelar no borra los fallos que ya tenías
+  let p = await open('light', seedGoal({ start:add(TODAY, -6), days:28, levels:seq(add(TODAY, -6), [2,2,2,2]) }));
+  ok(/Llevas 2 días sin cumplir/.test(await p.locator('.notices').textContent()) && await dotCls(p, 1) === 'miss' && await dotCls(p, 2) === 'miss', 'antes de congelar: aviso y martes y miércoles en rojo');
+  await nav(p, 'frentes'); await p.click('[data-act=front-sheet][data-id=f1]'); await p.click('[data-act=front-freeze]'); await p.waitForTimeout(80); await nav(p, 'hoy');
+  ok(await dotCls(p, 1) === 'miss' && await dotCls(p, 2) === 'miss', 'al congelar, los días que ya fallaste siguen en rojo');
+  ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
+  // al activar un frente congelado: sin falsa alarma, los días congelados no se pintan de rojo y no hay árbol que salvar
+  p = await open('light', seedGoal({ start:add(TODAY, -10), days:28, levels:seq(add(TODAY, -10), [2,2,2,2,2]), frontExtra:{ status:'frozen', pauses:[{ from:add(TODAY, -4) }] } }));
+  await nav(p, 'frentes'); await p.click('[data-act=front-activate]'); await p.waitForTimeout(80); await nav(p, 'hoy');
+  const nts = await p.locator('.notices').textContent().catch(() => '');
+  ok(!/sin cumplir|La última vez|marchitando/.test(nts), `al activar no hay falsa alarma ni árbol que salvar ("${nts.trim()}")`);
+  ok(await dotCls(p, 0) !== 'miss' && await dotCls(p, 1) !== 'miss' && await dotCls(p, 2) !== 'miss', 'los días congelados no salen en rojo');
+  await nav(p, 'metas'); ok(/1 marchito/.test(await p.locator('.forest .forest-count').textContent()), 'el día que fallaste antes de congelar sigue marchito en el bosque');
+  ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
+  // congelar saca del plan la Principal, los Extras y lo pendiente; la Principal fallada queda guardada
+  const plan = { ...seedGoal({ start:add(TODAY, -3), days:28 }),
+    'tasks/a':{ title:'Estudiar módulo 3', frontId:'f1', minutes:45, slot:'critical', date:TODAY, done:false, created:1 },
+    'tasks/b':{ title:'Laboratorio 2', frontId:'f1', minutes:30, slot:'secondary', date:add(TODAY, 1), done:false, created:2 },
+    'tasks/c':{ title:'Repasar notas', frontId:'f1', minutes:20, slot:'critical', date:add(TODAY, -1), done:false, created:3 },
+    'tasks/d':{ title:'Módulo 1', frontId:'f1', minutes:45, slot:'critical', date:add(TODAY, -2), done:true, doneAt:add(TODAY, -2), created:4 } };
+  p = await open('light', plan);
+  await nav(p, 'frentes'); await p.click('[data-act=front-sheet][data-id=f1]'); await p.click('[data-act=front-freeze]'); const tt = await toastText(p); await p.waitForTimeout(80);
+  const ts = Object.fromEntries((await store(p)).tasks.map(t => [t.id, t]));
+  ok(/CCFA congelado\. Su hábito queda en pausa\. Salieron 3 tareas de tu plan\./.test(tt), `el aviso dice qué salió del plan ("${tt}")`);
+  ok(['a', 'b', 'c'].every(k => !ts[k].slot && !ts[k].date) && ts.d.slot === 'critical' && ts.d.done, 'las pendientes salen del plan y la hecha se queda');
+  ok((ts.c.missed || []).includes(add(TODAY, -1)) && !(ts.a.missed || []).length, 'la Principal de ayer sin hacer queda guardada como fallada');
+  await nav(p, 'hoy'); ok(await p.locator('.main-task').count() === 0 && !/Pendiente/.test(await p.locator('#view').textContent()), 'Hoy ya no muestra tareas del frente congelado');
+  ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
+  p = await open('light', { ...seedGoal({ start:add(TODAY, -3), days:28, habit:false }), 'tasks/a':plan['tasks/a'] });
+  await nav(p, 'frentes'); await p.click('[data-act=front-sheet][data-id=f1]'); await p.click('[data-act=front-freeze]');
+  ok((await toastText(p)) === 'CCFA congelado. Salió de tu plan: Estudiar módulo 3.', 'con una sola tarea la nombra'); await p.close();
+  // el bosque de un frente congelado no marca hoy; un objetivo vencido no tiene «esta semana»
+  p = await open('light', { ...seedGoal({ start:add(TODAY, -6), days:28, levels:seq(add(TODAY, -6), [2,2,2]), frontExtra:{ status:'frozen', pauses:[{ from:add(TODAY, -3) }] } }) });
+  await nav(p, 'metas'); ok(await p.locator('.forest .today').count() === 0, 'el bosque de un frente congelado no marca hoy'); await p.close();
+  p = await open('light', seedGoal({ start:add(TODAY, -40), days:28 })); await nav(p, 'metas');
+  ok(/Plazo vencido/.test(await p.locator('.goal').textContent()) && await p.locator('.goal .trow.cur').count() === 0 && !/esta semana/.test(await p.locator('.goal').textContent()), 'un objetivo vencido no marca «esta semana»');
+  await nav(p, 'frentes'); await p.click('[data-act=help][data-k=congelados]'); ok(/menos de 2 proyectos activos/.test(await p.locator('.sheet').textContent()), 'la ayuda de Congelados habla de proyectos');
+  ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
+}
 // ---------- 7. hojas en iPhone ----------
 console.log('\nHojas en iPhone');
 { // con su aspecto nativo, el iPhone (RenderThemeIOS) pone a los campos de hora y fecha relleno de .5em y box-sizing:content-box

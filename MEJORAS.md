@@ -12,7 +12,7 @@ Cada fase termina con la app publicada y usable. No se empieza una fase sin cerr
 |---|---|---|---|
 | **0 · Base** ✓ | Repo con historial, pruebas automáticas, el bosque y el estilo compacto | Tarea 0 | Cerrada: publicado en el artifact (versión 11) |
 | **1 · Lo crítico** ✓ | Lo que protege tus datos y quita fricción diaria | Tarea 7 → Tarea 3 → Tarea 1 → Tarea 2 | Cerrada: publicado en el artifact (versión 13). Solo falta que descargues tu primera copia |
-| **2 · Usarla** | 4 semanas de uso real, **sin funciones nuevas** (solo arreglar errores) | — | Pasaron 4 domingos con revisión cerrada |
+| **2 · Usarla** | 4 semanas de uso real, **sin funciones nuevas** (solo arreglar errores) | Tarea 8 → Tarea 9 → Tarea 10 (adelantadas) | Pasaron 4 domingos con revisión cerrada |
 | **3 · Según el uso** | Solo lo que el uso real pida, en este orden por defecto | Tarea 5 → Tarea 6 → Tarea 4 | Tú decides, con lo anotado en la fase 2 |
 | **4 · Fuera del artifact** | La versión independiente (sección 3) | — | Fuera de alcance por ahora |
 
@@ -20,6 +20,7 @@ Cada fase termina con la app publicada y usable. No se empieza una fase sin cerr
 - La **Tarea 7** (frentes de hábito) entró primero a la fase 1 porque salió del uso real: armar un hábito como leer exigía crear una tarea cada día.
 - La **Tarea 3** va después: hoy tus datos viven solo en el artifact y no tienen copia. Se hace antes de cambiar cómo se guardan (Tarea 1).
 - En la **fase 2**, lo que estorbe se anota en Semana → «¿Qué voy a cambiar?» empezando con `App:` (se guarda solo, cualquier día). Al final de la fase se leen esas 4 revisiones en Anteriores y de ahí sale la fase 3.
+- Las **Tareas 8, 9 y 10** salieron de la revisión del 12 oct (Bandeja y Frentes). La 8 arregla errores; la 9 y la 10 son funciones nuevas que el usuario decidió adelantar porque vienen del uso real.
 - La **Tarea 5** se reduce: el bosque ya muestra cada día de cada objetivo. Queda el porcentaje de días ganados del mes y la mejor racha de cada hábito.
 - La **Tarea 4** (IA) va al final porque es la más grande y la única que depende de una capability (`sample`) cuya forma exacta hay que verificar antes de escribir código.
 - **Capabilities:** cada publicación que las declare debe repetir **todas** (la regla completa de `db`, más `downloads` desde la Tarea 3 y más `sample` desde la Tarea 4). Si se omite una, se pierde.
@@ -80,7 +81,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 
 - `slot:"critical"` es la Principal y `slot:"secondary"` es un Extra. Una tarea en la Bandeja tiene `frontId:null` y `slot:null`.
 - Un hábito con `log = "auto"` fue marcado por `syncHabit()` al completar una tarea de su frente.
-- Los hábitos de frentes congelados están en pausa (`habitPaused`).
+- Un hábito no toca los días en que su frente estuvo congelado: `scheduled(h, d)` mira `paused(frente, d)`. Esos días no son fallos, no cortan la racha y no se pintan en rojo; la cuenta de fallos (`missedRun`) y la del bosque empiezan de cero después de un tramo congelado.
 - `goalWeek(g)` vale 0 si el objetivo todavía no empieza.
 - `pauses`: el día `from` ya está congelado y el día `to` no. Un frente congelado sin `pauses` (de antes del bosque) cuenta como congelado desde siempre; al activarlo se guarda `{from:"2000-01-01", to:hoy}`.
 
@@ -207,6 +208,46 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 - No se puede copiar ni restaurar hasta que la app terminó de cargar (si no, la copia saldría vacía). La fecha de la última copia se conserva al restaurar.
 - La guía pide descargar los datos cada domingo.
 - Mapa: `COLS`, `backupData`, `backupSave`, `backupParse`, `restorePick`, `restoreSheet`, `restoreRun`, `loaded`, `dl`, `RS`, `restoring`. Pruebas en `tests/run.mjs` (sección "Copia de seguridad"); `tests/mock.js` simula `downloads` (`window.__NODL` lo apaga) y fallos de escritura (`window.__FAILAT`).
+
+### Tarea 8: Congelar y activar sin errores *(fase 2 · hecha, falta publicar)*
+
+**Problema (revisión del 12 oct, «revisar completo»):** al activar un frente con hábito salía «Llevas 2 días sin cumplir…» y los días congelados se pintaban de rojo; al congelarlo se borraban los fallos que ya tenía. Su Principal de hoy o de mañana se quedaba en Hoy (y al marcarla crecía el bosque de un frente congelado). El bosque congelado marcaba «hoy», un objetivo vencido seguía con «esta semana» y la ayuda de Congelados decía «2 frentes».
+
+**Hecho:**
+- `scheduled(h, d)` mira si el frente estaba congelado **ese día** (`paused`), no si lo está hoy. Se quitaron `habitPaused` y `prevScheduled`.
+- `missedRun` se corta en un tramo congelado; el bosque también (`forestDays` reinicia la cuenta y `forestWilting` no pide salvar un árbol de antes de congelar). Hoy congelado no es semilla ni se marca en la isla, y `forestGoal` no da bosque a un frente congelado.
+- **Congelar** saca del plan la Principal, los Extras y lo pendiente del frente (`keepMiss` guarda la Principal fallada) y el aviso lo dice: «CCFA congelado. Salió de tu plan: Estudiar módulo 3.».
+- Metas: un objetivo vencido no marca ninguna semana como «esta semana».
+- Ayuda de Congelados: «menos de 2 proyectos activos».
+
+**Listo cuando:** congelar y activar no cambian el pasado ni dejan tareas del frente en Hoy. Cubierto por `tests/run.mjs` («Congelar y activar»).
+
+### Tarea 9: Ideas congeladas desde la Bandeja *(fase 2 · adelantada)*
+
+**Problema:** «las notas que ponga en bandeja debería poder moverlas a congelar… no solo de mis frentes activos sino general». Hoy «Mover a…» solo ofrece frentes, y el «Congelar» de «Planear mañana» manda la nota al primer frente congelado que encuentre (con los datos reales, a eJPT, donde queda escondida como «1 tarea»).
+
+**Hacer:**
+- Campo opcional `tasks.someday: "YYYY-MM-DD"` (día en que se congeló) en notas sin frente y sin plan. `inbox()` las excluye (el punto de la Bandeja baja); `ideas()` las lista.
+- «Mover a…» de una nota sin frente: primera opción **Congelar · para algún día**. El «Congelar» de «Planear mañana» hace lo mismo (se quita la búsqueda por nombre «Algún día»).
+- Frentes → Congelados: grupo plegado **Ideas (N)**. Cada idea con «Activar» (vuelve a la Bandeja) y ⋯ («Mover a…»: frentes y Borrar). «Nada congelado» solo si no hay ni ideas ni frentes.
+- Los frentes de hábito no se ofrecen como destino de una nota (no muestran tareas). En «Planear mañana», «Borrar» pide dos toques como en «Mover a…».
+- Ayuda y guía: Bandeja, Congelados, Mañana.
+
+**Listo cuando:** una idea general se congela con dos toques, no aparece en la Bandeja ni en ningún frente, se ve en Congelados y vuelve a la Bandeja con «Activar»; la copia y la restauración la conservan.
+
+### Tarea 10: Frentes congelados sin fechas; las fechas al activar *(fase 2 · adelantada)*
+
+**Problema:** «Debería poder decir si va a estar activa o congelada… que no se cree para esa un bosque ni pida fecha de inicio y fin hasta que la quiera activar». El asistente crea el frente activo si hay cupo y siempre pide fechas; eJPT quedó del 12 oct al 8 nov y su plazo corre aunque esté congelado.
+
+**Hacer:**
+- Primer paso del asistente: **Activo** o **Congelado** (también para hábitos). Con 2 proyectos activos, el proyecto queda Congelado. «Nuevo» en Congelados abre con Congelado.
+- Congelado pide el nombre, ideas de tareas (si es proyecto) y el objetivo **sin fechas** (qué y por qué); no pide hábito y no hay bosque. `goals.start`/`deadline` pueden ser `null` mientras el frente esté congelado.
+- Metas: los objetivos de frentes congelados (con o sin fechas, como eJPT) van en un grupo plegado **Congelados**: título y «Congelado desde …», sin barra, semanas ni bosque.
+- **Activar** un frente con objetivo abre una hoja con Inicio y Fecha límite (las mismas de `goalFields`, ya llenas) y el botón «Activar». Si ya hay 2 proyectos activos, la misma hoja deja congelar uno. Sin objetivo, «Activar» sigue siendo un toque.
+- En ⋯ de un frente congelado se ven sus tareas.
+- Ayuda, guía y sección 1 (flujo del asistente, modelo de datos).
+
+**Listo cuando:** se puede crear un frente congelado sin fechas ni bosque, activarlo después eligiendo las fechas en ese momento, y eJPT se arregla al activarlo.
 
 ### Tarea 4: IA dentro de la app *(media)*
 

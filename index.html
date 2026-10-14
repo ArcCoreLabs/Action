@@ -532,8 +532,7 @@ const inbox = () => S.tasks.filter(t => !t.frontId && !t.done && !t.slot).sort((
 const habits = () => S.habits.slice().sort(byOrder);
 const goalWeeks = g => (g && g.start && g.deadline && g.deadline >= g.start) ? Math.max(1, Math.min(52, Math.ceil((diffDays(g.start, g.deadline) + 1) / 7))) : 12;
 const goalFor = fid => S.goals.filter(g => g.frontId === fid && (!g.deadline || g.deadline >= today())).sort((a,b) => String(a.start||"").localeCompare(String(b.start||"")))[0];
-const habitPaused = h => { if (!h.frontId) return false; const f = S.fronts.find(x => x.id === h.frontId); return !!f && f.status !== "active"; };
-const scheduled = (h, d) => !habitPaused(h) && (h.days || []).includes(dow(d));
+const scheduled = (h, d) => { const f = h.frontId && front(h.frontId); return !(f && paused(f, d)) && (h.days || []).includes(dow(d)); }; // un día con el frente congelado no toca
 const settings = () => S.settings || {};
 
 function streak(h){
@@ -546,14 +545,14 @@ function streak(h){
   }
   return n;
 }
-function prevScheduled(h, from, k){ // k-ésimo día programado antes de `from`
-  let d = from, found = [];
-  for (let i = 0; i < 21 && found.length < k; i++){ d = addDays(d, -1); if (scheduled(h, d)) found.push(d); }
-  return found;
-}
-function missedRun(h){ // cuántos días programados seguidos se fallaron antes de hoy
-  const log = h.log || {}; const prev = prevScheduled(h, today(), 2); let n = 0;
-  for (const d of prev){ if (h.created && d < h.created) break; if (!log[d]) n++; else break; }
+function missedRun(h){ // cuántos días programados seguidos se fallaron antes de hoy (mira los 2 últimos; un tramo congelado corta la cuenta)
+  const log = h.log || {}, f = h.frontId && front(h.frontId); let d = today(), n = 0, seen = 0;
+  for (let i = 0; i < 21 && seen < 2; i++){
+    d = addDays(d, -1);
+    if ((h.created && d < h.created) || (f && paused(f, d))) break;
+    if (!scheduled(h, d)) continue;
+    seen++; if (log[d]) break; n++;
+  }
   return n;
 }
 function dayState(d){
@@ -594,6 +593,7 @@ function forestDays(g, all){ // all: todos los días; si no, el bloque de 364 qu
     const d = addDays(g.start, i), x = {d, i, lvl:lvl[d] || 0, state:"rest"};
     if (d > t) x.state = "future";
     else if (x.lvl){ x.state = ["", "sprout", "tree", "fruit"][x.lvl]; if (wilted && miss === 1) wilted.state = "saved"; miss = 0; wilted = null; }
+    else if (paused(f, d)){ miss = 0; wilted = null; } // congelado: queda en pasto y al volver empiezas de cero
     else if (d === t) x.state = "seed";
     else if (due(d)){ miss++; x.state = miss === 1 ? "wilt" : miss === 2 ? "dry" : "bare"; if (miss === 1) wilted = x; }
     days.push(x);
@@ -602,10 +602,10 @@ function forestDays(g, all){ // all: todos los días; si no, el bloque de 364 qu
   const off = Math.max(0, Math.min(Math.floor(diffDays(g.start, t) / 364), Math.floor((n - 1) / 364))) * 364;
   return days.slice(off, off + 364).map((x, j) => ({...x, i:j}));
 }
-function forestGoal(fid){ const d = today(); return fid ? S.goals.filter(g => g.frontId === fid && forestOn(g) && g.start <= d && d <= g.deadline).sort((a, b) => a.start.localeCompare(b.start))[0] || null : null; }
+function forestGoal(fid){ const d = today(); return fid && !paused(front(fid), d) ? S.goals.filter(g => g.frontId === fid && forestOn(g) && g.start <= d && d <= g.deadline).sort((a, b) => a.start.localeCompare(b.start))[0] || null : null; }
 function forestWilting(g){ // ¿hay un árbol marchito esperando que lo salves hoy?
-  const days = forestDays(g, true), t = today(), x = days.find(y => y.d === t);
-  const prev = days.filter(y => y.d < t && y.state !== "rest").pop();
+  const days = forestDays(g, true), t = today(), x = days.find(y => y.d === t), f = front(g.frontId);
+  const prev = days.filter(y => y.d < t && (y.state !== "rest" || paused(f, y.d))).pop(); // después de un tramo congelado ya no hay nada que salvar
   return !!(x && !x.lvl && prev && prev.state === "wilt");
 }
 function forestGrow(fid, to){ // texto para el aviso si hoy crece algo (se calcula antes de guardar)
@@ -667,7 +667,7 @@ function forestSvg(g, days){
     const cx = p.x, cy = p.y + H / 2, art = forestArt(x);
     let grow = "";
     if (x.d === t){ const lv = RANK[x.state] || 0, prev = forestSeen[g.id]; forestSeen[g.id] = lv; if (prev !== undefined && lv > prev) grow = ' class="grow"'; }
-    if (x.d === t) top = dia(p.x, p.y, "today");
+    if (x.d === t && x.state !== "rest") top = dia(p.x, p.y, "today"); // hoy congelado no se marca
     const shadow = /tree|fruit|saved|wilt/.test(x.state) ? `<ellipse class="sh" cx="1.6" cy=".6" rx="${x.state === "saved" ? 3.6 : 5}" ry="${x.state === "saved" ? 1.6 : 2.2}"/>` : "";
     return (art ? `<g transform="translate(${cx} ${cy}) scale(.84)">${shadow}<g${grow}>${art}</g></g>` : "");
   }).join("");
@@ -907,7 +907,7 @@ VIEWS.metas = function(){
   const st = settings();
   const goals = S.goals.slice().sort((a,b) => String(a.deadline||"").localeCompare(String(b.deadline||"")));
   const sect = g => {
-    const f = front(g.frontId), wk = goalWeek(g), N = goalWeeks(g), weekly = (g.weekly || []).slice(0, N);
+    const f = front(g.frontId), wk = goalWeek(g), N = goalWeeks(g), weekly = (g.weekly || []).slice(0, N), wkNow = g.deadline && today() > g.deadline ? 0 : wk; // vencido: ninguna es «esta semana»
     const doneN = weekly.filter(w => w && w.done).length;
     const elapsed = g.start && g.deadline ? Math.max(0, Math.min(100, diffDays(g.start, today()) / Math.max(1, diffDays(g.start, g.deadline)) * 100)) : 0;
     const pm = (g.premortem || []).filter(p => p && (p.cause || p.counter));
@@ -921,9 +921,9 @@ VIEWS.metas = function(){
       <div><div class="bar"><span style="width:${fst ? hit / Math.max(1, plan) * 100 : doneN/N*100}%"></span><i style="left:${elapsed}%"></i></div>
         <p class="bar-legend">${join([g.start && today() < g.start ? `Empieza el ${fmtShort(g.start)}` : g.deadline && today() > g.deadline ? (hk ? "Terminó" : doneN === N ? "Cumplido" : "Plazo vencido") : fst ? `Día ${diffDays(g.start, today()) + 1} de ${fst.total}` : `Semana ${wk} de ${N}`, fst ? plural(hit, "día cumplido", "días cumplidos") : `${doneN}/${N} semanas cumplidas`, g.deadline && today() <= g.deadline ? `faltan ${diffDays(today(), g.deadline)} días` : ""])}</p></div>
       ${forestOn(g) ? forestBlock(g) : ""}
-      ${items.length && !hk ? `<div class="list">${items.map(w => `<div class="trow ${w.done ? "done" : ""} ${w.i + 1 === wk ? "cur" : ""}">
+      ${items.length && !hk ? `<div class="list">${items.map(w => `<div class="trow ${w.done ? "done" : ""} ${w.i + 1 === wkNow ? "cur" : ""}">
         <button class="check ${w.done ? "on" : ""}" data-act="goal-week" data-id="${g.id}" data-i="${w.i}" aria-label="Marcar semana ${w.i + 1}">${ICON.check}</button>
-        <div class="tmain"><span class="ttitle">${w.text ? esc(w.text) : '<span class="muted">Sin definir</span>'}</span><span class="tmeta">Semana ${w.i + 1}${w.i + 1 === wk ? " · esta semana" : ""}</span></div></div>`).join("")}</div>` : ""}
+        <div class="tmain"><span class="ttitle">${w.text ? esc(w.text) : '<span class="muted">Sin definir</span>'}</span><span class="tmeta">Semana ${w.i + 1}${w.i + 1 === wkNow ? " · esta semana" : ""}</span></div></div>`).join("")}</div>` : ""}
       ${(gMin || g.trigger || gStd || g.why || pm.length) ? `<details><summary>Plan</summary><div class="d-body kvs">
         ${gMin ? `<dl class="kv"><dt>Mínimo innegociable</dt><dd>${esc(gMin)}</dd></dl>` : ""}
         ${gStd ? `<dl class="kv"><dt>Estándar</dt><dd>${esc(gStd)}</dd></dl>` : ""}
@@ -991,7 +991,7 @@ const HELP = {
   bandeja:["Bandeja", ["Escribe aquí cualquier pendiente apenas se te ocurra, sin organizarlo.", "Marca la casilla si ya lo hiciste.", "Toca <b>Mover</b> para enviarlo a un frente.", "Déjala vacía cada noche."]],
   frentes:["Frentes", ["Al crear un frente eliges el tipo:", "<b>Proyecto</b>: tareas distintas, como CCFA o THM. Máximo 2 activos; el resto va a Congelados.", "<b>Hábito</b>: lo mismo cada día, como leer 20 minutos. No tiene tareas y no ocupa cupo.", "Debajo del nombre ves su objetivo, lo que toca esta semana y su hábito.", "Escribe tareas concretas que empiecen con un verbo: “Resolver la sala de XSS”.", "Toca <b>⋯</b> en una tarea para ponerla como principal de hoy o de mañana."]],
   habitosf:["Hábitos", ["Lo que haces igual cada día, como leer 20 minutos.", "No tienen tareas: en <b>Hoy</b> tocas <b>▶</b> y al terminar el tiempo se marca solo.", "No ocupan los 2 cupos de proyectos.", "Si le pones un objetivo con fechas, también tiene su bosque.", "Para cambiar el tiempo o los días: <b>⋯</b> → Editar hábito."]],
-  congelados:["Congelados", ["Proyectos que te interesan pero no son para ahora.", "No se pierden: quedan guardados con sus tareas.", "Toca <b>Activar</b> cuando tengas menos de 2 frentes activos."]],
+  congelados:["Congelados", ["Proyectos que te interesan pero no son para ahora.", "No se pierden: quedan guardados con sus tareas.", "Toca <b>Activar</b> cuando tengas menos de 2 proyectos activos."]],
   metas:["Metas", ["De lo grande a lo pequeño:", "<b>Visión</b>: hacia dónde vas en años.", "<b>Objetivo</b>: lo que logras entre una fecha de inicio y una fecha límite.", "<b>Semanas</b>: lo que debe estar hecho cada domingo.", "Las tareas del día van en Frentes."]],
   vision:["Visión", ["Una o dos frases sobre hacia dónde vas en los próximos años.", "Solo da dirección, no es una tarea."]],
   objetivos:["Objetivos", ["Un resultado medible con fecha límite, como “Aprobar la CCFA”.", "Las semanas salen solas de tus fechas: 4 semanas si pones un mes, 12 si pones tres.", "Si es de un hábito no tiene semanas: avanza por días (Día 5 de 23 · 4 días cumplidos).", "Escribe qué debe estar hecho cada semana y márcalo el domingo.", "En <b>Plan</b> quedan tu mínimo, cuándo lo haces y qué podría salir mal.", "El <b>bosque</b> crece con cada día que avanzas en el frente.", "La línea naranja de la barra marca el tiempo que ha pasado."]],
@@ -1629,7 +1629,11 @@ const A = {
     if (W.wantHabit){ W.habit.minimum = W.habit.minimum || W.goal.minimum || ""; W.habit.standard = W.habit.standard || W.goal.standard || ""; } wzRedraw(); },
   "wz-create"(){ wzCapture(); if (wzCur() === "goal" && !wzGoalOk()) return; if (W.wantHabit && !W.habit.days.length){ toast("Elige al menos un día para el hábito."); return; } wizardCreate(); },
   "habit-quick"(d){ habitQuick(d.front); },
-  "front-freeze"(d){ const f = front(d.id); if (f){ put("fronts", {...f, status:"frozen", pauses:[...(f.pauses || []), {from:today()}]}); closeModal(); toast(S.habits.some(h => h.frontId === f.id) ? `${f.name} congelado. Su hábito queda en pausa.` : `${f.name} congelado.`); } },
+  "front-freeze"(d){ const f = front(d.id); if (!f) return;
+    const out = S.tasks.filter(t => t.frontId === f.id && t.slot && !t.done); // Principal y Extras pendientes: un frente congelado no ocupa tu plan
+    out.forEach(t => put("tasks", {...t, ...keepMiss(t), slot:null, date:null}));
+    put("fronts", {...f, status:"frozen", pauses:[...(f.pauses || []), {from:today()}]}); closeModal();
+    toast([`${f.name} congelado.`, S.habits.some(h => h.frontId === f.id) ? "Su hábito queda en pausa." : "", out.length === 1 ? `Salió de tu plan: ${out[0].title}.` : out.length ? `Salieron ${out.length} tareas de tu plan.` : ""].filter(Boolean).join(" ")); },
   "front-activate"(d){ const f = front(d.id); if (!f) return; if (!isHabitFront(f) && projects().length >= 2){ toast("Ya tienes 2 proyectos activos. Congela uno primero."); return; } put("fronts", {...f, status:"active", order: active().length + 1, pauses:(f.pauses || []).length ? f.pauses.map(p => p.to ? p : {...p, to:today()}) : [{from:"2000-01-01", to:today()}]}); closeModal(); toast(`${f.name} activado.`); },
   "front-del"(d){ if (confirmTap("fdel-" + d.id)){ S.tasks.filter(t => t.frontId === d.id).forEach(t => t.done ? put("tasks", {...t, frontId:null, archived:true}) : remove("tasks", t.id)); S.goals.filter(g => g.frontId === d.id).forEach(g => remove("goals", g.id)); S.habits.filter(h => h.frontId === d.id).forEach(h => remove("habits", h.id)); remove("fronts", d.id); closeModal(); toast("Frente borrado."); } },
   "goal-new"(d){ goalForm(null, null, d && d.front); },
