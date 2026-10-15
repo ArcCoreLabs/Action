@@ -765,6 +765,14 @@ console.log('\nPrincipales automáticas');
   ok((await p.locator('.main-task .mt-title').allTextContents()).join('|') === 'Módulo 1', 'un proyecto solo sale los días de su hábito');
   ok(!/no tiene tareas/.test(await p.locator('#view').textContent()), 'con tareas en los dos proyectos no hay aviso de proyecto vacío');
   await p.close();
+  { // jueves con las dos Principales sin hacer: Mañana (viernes, tocan los dos) muestra la siguiente de cada uno, no repite la de hoy
+    const q = await open('light', seed); await q.waitForTimeout(500);
+    const tm = q.locator('section.block:has(h2:text-is("Mañana"))'), txt = await tm.textContent();
+    ok(/Módulo 2/.test(txt) && /Lab Web/.test(txt) && !/Módulo 1|Lab Kill Chain/.test(txt) && /Sigue después de la de hoy/.test(txt), `Mañana no repite la Principal de hoy, muestra la que sigue (${txt.replace(/\s+/g, ' ').trim()})`);
+    await q.click('.main-task:has-text("Módulo 1") [data-act=done]'); await q.waitForTimeout(400);
+    ok(/Módulo 2[^]*Saldrá sola mañana/.test(await tm.textContent()), 'hecha la de hoy, la siguiente dice "Saldrá sola mañana"');
+    ok(!q.errs.length, 'sin errores ' + q.errs.join('|')); await q.close();
+  }
   // JPT sin tareas pendientes: no sale su Principal, pero Hoy lo avisa y "Agregar" lleva a escribirle una; al agregarla sale sola
   const empty = Object.fromEntries(Object.entries(seed).filter(([k]) => !/^tasks\/b/.test(k)));
   for (const h of ['habits/ha', 'habits/hb']) empty[h] = { ...seed[h], created:TODAY }; // sin días fallados: si no, gana el aviso de hábitos

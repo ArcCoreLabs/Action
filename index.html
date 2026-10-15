@@ -839,7 +839,7 @@ const VIEWS = {};
 
 VIEWS.hoy = function(){
   const d = today(), cs = crits(d), s = secs(d), hs = habits(), tm = addDays(d, 1);
-  const cT = crits(tm), soon = cT.length ? cT : projects().filter(f => dueOn(f, tm)).map(f => cs.find(x => x.frontId === f.id && !x.done) || nextTask(f.id)).filter(Boolean); // mañana: lo que ya está o lo que saldrá solo
+  const cT = crits(tm), soon = [...cT, ...projects().filter(f => !critOf(tm, f.id) && dueOn(f, tm)).map(f => nextTask(f.id)).filter(Boolean).map(t => ({...t, auto:true}))]; // mañana: lo que ya está o lo que saldrá solo (nunca repite la de hoy)
 
   const nt = []; // de todos los avisos se muestra solo el primero: van en orden de importancia
   const names = list => list.map(h => esc(h.name)).join(" y ");
@@ -897,7 +897,7 @@ VIEWS.hoy = function(){
     ${hs.length ? (hrows ? `<div class="list">${hrows}</div>` : '<p class="empty">Hoy no toca ningún hábito.</p>') : dash("Crear hábito", "habit-new")}</section>
   <section class="block">${head("Semana", "dots")}<div class="dots">${dots}</div></section>
   <section class="block">${head("Mañana", "manana")}
-    ${soon.length ? `<div class="list">${soon.map(t => `<div class="trow plain"><div class="tmain"><span class="ttitle">${esc(t.title)}</span><span class="tmeta">${join([(front(t.frontId) || {}).name ? esc(front(t.frontId).name) : "", cT.length ? "Principal de mañana" : "Saldrá sola mañana"])}</span></div></div>`).join("")}</div><button class="text-btn muted" data-act="night" style="padding-left:0">Planear mañana</button>` : dash("Planear mañana", "night")}</section>`;
+    ${soon.length ? `<div class="list">${soon.map(t => `<div class="trow plain"><div class="tmain"><span class="ttitle">${esc(t.title)}</span><span class="tmeta">${join([(front(t.frontId) || {}).name ? esc(front(t.frontId).name) : "", !t.auto ? "Principal de mañana" : critOf(d, t.frontId) && !critOf(d, t.frontId).done ? "Sigue después de la de hoy" : "Saldrá sola mañana"])}</span></div></div>`).join("")}</div><button class="text-btn muted" data-act="night" style="padding-left:0">Planear mañana</button>` : dash("Planear mañana", "night")}</section>`;
 };
 
 VIEWS.bandeja = function(){
