@@ -429,6 +429,7 @@ ul.help{font-size:14px}
 .opt[disabled]{opacity:.45;cursor:not-allowed}
 .main-task.late{box-shadow:inset 3px 0 0 var(--warn)} /* Principal vencida: sigue en Hoy hasta que la hagas */
 .late-txt{color:var(--warn);font-weight:600}
+.trow .tmeta.wk-tasks{display:grid;gap:1px;color:var(--ok)} /* lo que hiciste esa semana desde Hoy */
 /* ---------- calma: menos cosas que llaman la atención ---------- */
 .info{border-color:transparent;color:var(--faint);opacity:.75} /* la ayuda sigue ahí, pero ya no parece una alerta */
 .info:hover{color:var(--accent);border-color:transparent;opacity:1}
@@ -551,7 +552,10 @@ const habits = () => S.habits.slice().sort(byOrder);
 const goalWeeks = g => (g && g.start && g.deadline && g.deadline >= g.start) ? Math.max(1, Math.min(52, Math.ceil((diffDays(g.start, g.deadline) + 1) / 7))) : 12;
 const pauseFrom = f => { const p = (f.pauses || []).find(x => !x.to); return p ? p.from : f.status !== "active" ? "2000-01-01" : null; }; // día en que se congeló (sin pausas: desde siempre)
 const isFrozen = fid => { const f = front(fid); return !!f && f.status !== "active"; };
-const goalDone = g => { const N = g.start && g.deadline ? goalWeeks(g) : 0; return N > 0 && (g.weekly || []).slice(0, N).filter(w => w && w.done).length === N; }; // todas sus semanas marcadas («Cumplido»)
+const weekTasks = (g, i) => { if (!g.start || !g.deadline || !g.frontId) return []; const a = addDays(g.start, 7 * i), b = addDays(a, 6); // tareas del frente que terminaste en esa semana del objetivo
+  return S.tasks.filter(t => t.frontId === g.frontId && t.done && t.doneAt && t.doneAt >= a && t.doneAt <= b && t.doneAt <= g.deadline).sort((x, y) => x.doneAt.localeCompare(y.doneAt)); };
+const weekDone = (g, i) => !!((g.weekly || [])[i] || {}).done || weekTasks(g, i).length > 0; // se marca sola con una tarea hecha; o a mano
+const goalDone = g => { const N = g.start && g.deadline ? goalWeeks(g) : 0; return N > 0 && Array.from({length:N}, (_, i) => weekDone(g, i)).every(Boolean); }; // todas sus semanas marcadas («Cumplido»)
 const liveGoals = f => { const p = (f.pauses || []).find(x => !x.to), from = p ? p.from : today(); // los que seguían vivos al congelarlo (o se crearon sin fechas); primero los que tienen fechas
   return S.goals.filter(g => g.frontId === f.id && (!g.deadline || g.deadline >= from) && !goalDone(g)).sort((a,b) => String(a.start||"9999").localeCompare(String(b.start||"9999"))); };
 const planGoal = f => liveGoals(f)[0];
@@ -960,10 +964,10 @@ VIEWS.metas = function(){
   const goals = all.filter(g => !isFrozen(g.frontId)), cold = all.filter(g => isFrozen(g.frontId)); // los de frentes congelados van aparte: sin fechas ni bosque
   const sect = g => {
     const dated = !!(g.start && g.deadline), f = front(g.frontId), wk = goalWeek(g), N = dated ? goalWeeks(g) : 0, weekly = (g.weekly || []).slice(0, N), wkNow = g.deadline && today() > g.deadline ? 0 : wk; // vencido: ninguna es «esta semana»
-    const doneN = weekly.filter(w => w && w.done).length;
+    const doneN = Array.from({length:N}, (_, i) => weekDone(g, i)).filter(Boolean).length;
     const elapsed = g.start && g.deadline ? Math.max(0, Math.min(100, diffDays(g.start, today()) / Math.max(1, diffDays(g.start, g.deadline)) * 100)) : 0;
     const pm = (g.premortem || []).filter(p => p && (p.cause || p.counter));
-    const items = Array.from({length:N}, (_, i) => ({...(weekly[i] || {}), i}));
+    const items = Array.from({length:N}, (_, i) => ({...(weekly[i] || {}), i, done:weekDone(g, i), ts:weekTasks(g, i)}));
     const hk = isHabitFront(f), all = hk && forestOn(g) ? forestDays(g, true) : null, fst = all ? forestStats(g, all) : null, hit = fst ? fst.trees + fst.sprouts : 0;
     const hsF = S.habits.filter(h => h.frontId === g.frontId), gMin = (hsF[0] || {}).minimum || g.minimum, gStd = (hsF[0] || {}).standard || g.standard; // fuente única: el hábito (si está vacío, el de la meta vieja)
     const plan = all ? all.filter(x => x.lvl || (x.d >= today() ? hsF.some(h => daysOn(h, x.d)) : x.state !== "rest")).length : 0; // días que tocan: un hábito avanza por días, no por semanas
@@ -973,13 +977,13 @@ VIEWS.metas = function(){
       <div>${dated ? `<div class="bar"><span style="width:${fst ? hit / Math.max(1, plan) * 100 : doneN/N*100}%"></span><i style="left:${elapsed}%"></i></div>` : ""}
         <p class="bar-legend">${!dated ? "Sin fechas · ponlas en ⋯ → Editar" : join([g.start && today() < g.start ? `Empieza el ${fmtShort(g.start)}` : g.deadline && today() > g.deadline ? (hk ? "Terminó" : doneN === N ? "Cumplido" : "Plazo vencido") : fst ? `Día ${diffDays(g.start, today()) + 1} de ${fst.total}` : `Semana ${wk} de ${N}`, fst ? plural(hit, "día cumplido", "días cumplidos") : `${doneN}/${N} semanas cumplidas`, g.deadline && today() <= g.deadline ? `faltan ${diffDays(today(), g.deadline)} días` : ""])}</p></div>
       ${forestOn(g) ? forestBlock(g) : ""}
-      ${items.length && !hk ? (() => { const shown = w => w.text || w.done || w.i + 1 === (wkNow || (wk === 0 ? 1 : 0)); // las semanas vacías no se muestran: se pliegan
+      ${items.length && !hk ? (() => { const shown = w => w.i + 1 === (wkNow || (wk === 0 ? 1 : 0)); // a la vista solo esta semana; las demás, plegadas
         const row = w => `<div class="trow ${w.done ? "done" : ""} ${w.i + 1 === wkNow ? "cur" : ""}">
         <button class="check ${w.done ? "on" : ""}" data-act="goal-week" data-id="${g.id}" data-i="${w.i}" aria-label="Marcar semana ${w.i + 1}">${ICON.check}</button>
-        <div class="tmain"><span class="ttitle">${w.text ? esc(w.text) : '<span class="muted">Sin definir</span>'}</span><span class="tmeta">Semana ${w.i + 1}${w.i + 1 === wkNow ? " · esta semana" : ""}</span></div></div>`;
+        <div class="tmain"><span class="ttitle">${w.text ? esc(w.text) : '<span class="muted">Sin definir</span>'}</span><span class="tmeta">Semana ${w.i + 1}${w.i + 1 === wkNow ? " · esta semana" : ""}</span>${w.ts.length ? `<span class="tmeta wk-tasks">${w.ts.map(t => `<span>✓ ${esc(t.title)}</span>`).join("")}</span>` : ""}</div></div>`;
         const vis = items.filter(shown);
-        return `${vis.length ? `<div class="list">${vis.map(row).join("")}</div>` : ""}${vis.length < items.length ? `<details><summary>Todas las semanas (${items.length})</summary><div class="d-body"><div class="list">${items.map(row).join("")}</div></div></details>` : ""}`; })() : ""}
-      ${(gMin || g.trigger || gStd || g.why || pm.length) ? `<details><summary>Plan</summary><div class="d-body kvs">
+        return `${vis.length ? `<div class="list">${vis.map(row).join("")}</div>` : ""}${vis.length < items.length ? `<details data-keep="weeks-${g.id}" ${KEEP.has("weeks-" + g.id) ? "open" : ""}><summary>Todas las semanas (${doneN}/${items.length})</summary><div class="d-body"><div class="list">${items.map(row).join("")}</div></div></details>` : ""}`; })() : ""}
+      ${(gMin || g.trigger || gStd || g.why || pm.length) ? `<details data-keep="plan-${g.id}" ${KEEP.has("plan-" + g.id) ? "open" : ""}><summary>Plan</summary><div class="d-body kvs">
         ${gMin ? `<dl class="kv"><dt>Mínimo innegociable</dt><dd>${esc(gMin)}</dd></dl>` : ""}
         ${gStd ? `<dl class="kv"><dt>Estándar</dt><dd>${esc(gStd)}</dd></dl>` : ""}
         ${g.trigger ? `<dl class="kv"><dt>Disparador</dt><dd>${esc(g.trigger)}</dd></dl>` : ""}
@@ -1031,7 +1035,7 @@ VIEWS.semana = function(){
     ${(() => { const gs = act.filter(f => !isHabitFront(f)).map(f => goalFor(f.id)).filter(g => g && g.start && g.deadline); if (!gs.length) return "";
       return `<div class="qa" style="gap:14px"><span class="field-label">Tus objetivos</span>${gs.map(g => { const wk = goalWeek(g), N = goalWeeks(g), w = g.weekly || [], cur = w[wk-1] || {}, nx = w[wk] || {};
         return `<div class="stack" style="gap:8px"><span class="tmeta">${esc(g.title)}</span>
-          ${wk === 0 ? "" : `<div class="trow" style="border-top:0;padding:0;min-height:44px"><button class="check ${cur.done ? "on" : ""}" data-act="goal-week" data-id="${g.id}" data-i="${wk-1}" aria-label="Cumplí la semana">${ICON.check}</button><div class="tmain"><span class="ttitle">Semana ${wk}: ${cur.text ? esc(cur.text) : "sin definir"}</span><span class="tmeta">Márcala si la cumpliste</span></div></div>`}
+          ${wk === 0 ? "" : `<div class="trow" style="border-top:0;padding:0;min-height:44px"><button class="check ${weekDone(g, wk-1) ? "on" : ""}" data-act="goal-week" data-id="${g.id}" data-i="${wk-1}" aria-label="Cumplí la semana">${ICON.check}</button><div class="tmain"><span class="ttitle">Semana ${wk}: ${cur.text ? esc(cur.text) : "sin definir"}</span><span class="tmeta">${(n => n ? `Se marcó sola: ${plural(n, "tarea hecha", "tareas hechas")}` : "Márcala si la cumpliste")(weekTasks(g, wk-1).length)}</span></div></div>`}
           ${wk < N ? `<label class="field" for="rv-w-${g.id}"><span class="tmeta">${wk === 0 ? "Semana 1 (empieza el " + fmtShort(g.start) + ")" : "Semana " + (wk+1)}: ¿qué debe estar hecho?</span><input type="text" id="rv-w-${g.id}" data-week-goal="${g.id}" data-i="${wk}" value="${esc(nx.text || "")}"></label>` : '<span class="tmeta">Es la última semana del objetivo.</span>'}</div>`; }).join("")}</div>`; })()}
     <button class="btn primary block" data-act="review-close">${r.closed ? "Guardar cambios" : "Cerrar revisión"}</button>
   </div></section>
@@ -1053,7 +1057,7 @@ const HELP = {
   congelados:["Congelados", ["Proyectos e ideas que te interesan pero no son para ahora.", "No se pierden: quedan guardados con sus tareas (las ves en <b>⋯</b>).", "Toca <b>Activar</b> en un frente: si tiene objetivo, ahí eliges sus fechas (si ya tenía avance, su bosque sigue). Si ya tienes 2 proyectos activos, ahí mismo congelas uno.", "<b>Nuevo</b> crea un frente que empieza congelado.", "<b>Ideas</b>: lo que congelaste desde la Bandeja. <b>Activar</b> la devuelve a la Bandeja; <b>⋯</b> la mueve a un frente."]],
   metas:["Metas", ["De lo grande a lo pequeño:", "<b>Visión</b>: hacia dónde vas en años.", "<b>Objetivo</b>: lo que logras entre una fecha de inicio y una fecha límite.", "<b>Semanas</b>: lo que debe estar hecho cada domingo.", "Las tareas del día van en Frentes."]],
   vision:["Visión", ["Una o dos frases sobre hacia dónde vas en los próximos años.", "Solo da dirección, no es una tarea."]],
-  objetivos:["Objetivos", ["Un resultado medible con fecha límite, como “Aprobar la CCFA”.", "Las semanas salen solas de tus fechas: 4 semanas si pones un mes, 12 si pones tres.", "Si es de un hábito no tiene semanas: avanza por días (Día 5 de 23 · 4 días cumplidos).", "Escribe qué debe estar hecho cada semana y márcalo el domingo.", "En <b>Plan</b> quedan tu mínimo, cuándo lo haces y qué podría salir mal.", "Los de frentes congelados quedan plegados en <b>Congelados</b>, sin fechas ni bosque, hasta que actives el frente.", "El <b>bosque</b> crece con cada día que avanzas en el frente.", "La línea naranja de la barra marca el tiempo que ha pasado."]],
+  objetivos:["Objetivos", ["Un resultado medible con fecha límite, como “Aprobar la CCFA”.", "Las semanas salen solas de tus fechas: 4 semanas si pones un mes, 12 si pones tres.", "Si es de un hábito no tiene semanas: avanza por días (Día 5 de 23 · 4 días cumplidos).", "Escribe qué debe estar hecho cada semana. Cuando terminas en Hoy una tarea del frente, la semana se marca sola y debajo ves lo que hiciste; si avanzaste por fuera, márcala tú.", "A la vista queda solo esta semana; las demás están en <b>Todas las semanas</b>.", "En <b>Plan</b> quedan tu mínimo, cuándo lo haces, por qué y qué podría salir mal: es el cómo del objetivo, no otra meta.", "Los de frentes congelados quedan plegados en <b>Congelados</b>, sin fechas ni bosque, hasta que actives el frente.", "El <b>bosque</b> crece con cada día que avanzas en el frente.", "La línea naranja de la barra marca el tiempo que ha pasado."]],
   semana:["Semana", ["Arriba ves tus números de la semana.", "El domingo, en 30 minutos, respondes la revisión y defines la meta de la próxima semana."]],
   revision:["Revisión", ["Responde con frases cortas.", "En <b>¿Qué voy a cambiar?</b> cambia el sistema, no a ti: un horario, un mínimo, una regla.", "Marca si cumpliste la semana de cada objetivo y escribe qué debe estar hecho la próxima.", "Después crea en Frentes las tareas de esa semana."]],
   anteriores:["Anteriores", ["Tus revisiones pasadas, para ver cómo vas."]],
@@ -1762,7 +1766,7 @@ const A = {
   "goal-edit"(d){ goalForm(d.id); },
   "goal-dup"(d){ goalForm(null, d.id); },
   "goal-del"(d){ if (confirmTap("gdel-" + d.id)){ remove("goals", d.id); closeModal(); } },
-  "goal-week"(d){ const g = S.goals.find(x => x.id === d.id); if (!g) return; const w = Array.from({length:Math.max(goalWeeks(g), (g.weekly || []).length)}, (_, i) => ({text:"", done:false, ...((g.weekly || [])[i] || {})})); w[+d.i].done = !w[+d.i].done; put("goals", {...g, weekly:w}); },
+  "goal-week"(d){ const g = S.goals.find(x => x.id === d.id); if (!g) return; const n = weekTasks(g, +d.i).length; if (n) return toast(`Esta semana se marcó sola: hiciste ${plural(n, "tarea", "tareas")} de este proyecto.`); const w = Array.from({length:Math.max(goalWeeks(g), (g.weekly || []).length)}, (_, i) => ({text:"", done:false, ...((g.weekly || [])[i] || {})})); w[+d.i].done = !w[+d.i].done; put("goals", {...g, weekly:w}); },
   backup(){ backupSave(); },
   "restore-do"(d, el, e){ if (!RS || restoring) return; if (confirmKey === "restore" && e.timeStamp - RS.armed < 400) return;
     if (!confirmTap("restore")){ RS.armed = e.timeStamp; return; } restoreRun(RS.data); },

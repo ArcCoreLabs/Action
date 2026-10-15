@@ -295,6 +295,16 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 
 **Cambio:** en Hoy, el aviso de menor prioridad dice «X no tiene tareas. Sin ellas no sale su Principal.» con el botón **Agregar**, que abre Frentes con el campo de nueva tarea de ese proyecto listo. Las ideas congeladas no cuentan como tareas. Al agregar una, sale sola como Principal si ese día toca.
 
+### Metas vivas y plegadas *(fase 2 · hecha, falta publicar)*
+
+**Problema:** (1) Mañana repetía la Principal de hoy si no estaba hecha. (2) Terminar tareas en Hoy no movía nada en Metas: las semanas solo se marcaban a mano. (3) Un objetivo de muchas semanas llenaba la vista.
+
+**Hecho:**
+- Mañana muestra, por proyecto, la Principal ya puesta o `nextTask` (nunca la de hoy). Si la de hoy sigue pendiente dice «Sigue después de la de hoy».
+- `weekTasks(g, i)`: tareas del frente con `doneAt` dentro de la semana i del objetivo. `weekDone(g, i)` = marcada a mano o con al menos una tarea. Lo usan la barra, «N/M semanas cumplidas», `goalDone` y Semana («Se marcó sola: 1 tarea hecha»). Tocar una semana marcada sola no la desmarca: avisa.
+- Metas: a la vista solo esta semana, con sus tareas hechas en verde; el resto en «Todas las semanas (hechas/total)». Esa lista y el Plan recuerdan si los abriste (`data-keep`).
+- Ayuda de Objetivos: Plan es el cómo del objetivo, no otra meta.
+
 ### Tarea 4: IA dentro de la app *(media)*
 
 Usar la capability `sample` (declararla: `sample:{}`). Se llama solo cuando el usuario toca un botón; nunca al cargar.
