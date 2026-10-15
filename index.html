@@ -855,6 +855,8 @@ VIEWS.hoy = function(){
   const old = S.tasks.filter(t => t.slot && t.date && t.date < d && !t.done && !(t.slot === "critical" && projects().some(f => f.id === t.frontId))).sort((a,b) => a.date.localeCompare(b.date));
   if (old.length) nt.push(`<p class="notice"><span>Pendiente: <b>${esc(old[0].title)}</b>${old.length > 1 ? ` (y ${old.length - 1} más)` : ""}</span><button class="text-btn" data-act="carry" data-id="${old[0].id}">Pasar a hoy</button><button class="text-btn muted" data-act="unassign" data-id="${old[0].id}">Quitar</button></p>`);
   if (!alarm.length && once.length) nt.push(`<p class="notice acc"><span>La última vez no cumpliste <b>${names(once)}</b>. Hoy no falles: haz al menos el mínimo.</span></p>`);
+  const empty = projects().filter(f => !S.tasks.some(t => t.frontId === f.id && !t.done && !t.someday)); // sin tareas no sale Principal: que no pase en silencio
+  if (empty.length) nt.push(`<p class="notice"><span><b>${names(empty)}</b> no ${empty.length > 1 ? "tienen" : "tiene"} tareas. Sin ellas no sale su Principal.</span><button class="text-btn" data-act="front-tasks" data-id="${empty[0].id}">Agregar</button></p>`);
 
   let main; const won = dayWon(d);
   const pRow = c => { const f = front(c.frontId), late = !c.done && c.since && c.since < d; // vencida: sigue aquí, en rojo, hasta que la hagas
@@ -1665,6 +1667,7 @@ function toast(msg){
 /* ================= acciones ================= */
 function confirmTap(key){ if (confirmKey === key){ confirmKey = null; return true; } confirmKey = key; sched(); setTimeout(() => { if (confirmKey === key){ confirmKey = null; sched(); } }, 4000); return false; }
 const A = {
+  "front-tasks"(d){ view = "frentes"; try { localStorage.setItem("ej-view", view); } catch(e){} closeModal(); render(); const i = document.getElementById("add-" + d.id); if (i){ i.scrollIntoView({block:"center"}); i.focus(); } },
   nav(d){ view = d.v; try { localStorage.setItem("ej-view", view); } catch(e){} closeModal(); render(); window.scrollTo(0,0); },
   close(){ closeModal(); },
   scrim(d, el, e){ if (e.target === el && !modal.guard) closeModal(); },

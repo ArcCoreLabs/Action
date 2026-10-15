@@ -763,7 +763,28 @@ console.log('\nPrincipales automáticas');
   const p = await b.newPage({ viewport:{ width:390, height:860 } }); await p.clock.setFixedTime(new Date('2026-10-12T09:00:00')); await p.addInitScript(s => { window.__SEED = s; }, seed);
   await p.goto('file://' + page); await p.waitForSelector('.sec-head'); await p.waitForTimeout(500);
   ok((await p.locator('.main-task .mt-title').allTextContents()).join('|') === 'Módulo 1', 'un proyecto solo sale los días de su hábito');
+  ok(!/no tiene tareas/.test(await p.locator('#view').textContent()), 'con tareas en los dos proyectos no hay aviso de proyecto vacío');
   await p.close();
+  // JPT sin tareas pendientes: no sale su Principal, pero Hoy lo avisa y "Agregar" lleva a escribirle una; al agregarla sale sola
+  const empty = Object.fromEntries(Object.entries(seed).filter(([k]) => !/^tasks\/b/.test(k)));
+  for (const h of ['habits/ha', 'habits/hb']) empty[h] = { ...seed[h], created:TODAY }; // sin días fallados: si no, gana el aviso de hábitos
+  empty['tasks/b0'] = { title:'Lab viejo', frontId:'b', minutes:60, slot:null, date:null, done:true, doneAt:add(TODAY, -2), created:3 };
+  empty['tasks/b9'] = { title:'Idea', frontId:'b', minutes:60, slot:null, date:null, done:false, someday:true, created:9 };
+  for (const scheme of ['light', 'dark']){
+    const q = await open(scheme, empty); await q.waitForTimeout(500);
+    ok((await q.locator('.main-task .mt-title').allTextContents()).join('|') === 'Módulo 1', `${scheme}: el proyecto sin tareas no saca Principal`);
+    const nt = await q.locator('.notice').allTextContents();
+    ok(nt.length === 1 && /JPT no tiene tareas\. Sin ellas no sale su Principal\./.test(nt[0]), `${scheme}: Hoy avisa que JPT no tiene tareas (${nt.join('|')})`);
+    await q.screenshot({ path:path.join(out, `proyecto-vacio-${scheme}.png`) });
+    if (scheme === 'light'){
+      await q.click('.notice [data-act=front-tasks]');
+      ok(await q.evaluate(() => document.activeElement && document.activeElement.id) === 'add-b', '"Agregar" abre Frentes con el campo de nueva tarea de JPT listo');
+      await q.keyboard.type('Lab Nmap'); await q.keyboard.press('Enter'); await q.waitForTimeout(200); await nav(q, 'hoy'); await q.waitForTimeout(500);
+      const t2 = await q.locator('.main-task .mt-title').allTextContents();
+      ok(t2.join('|') === 'Módulo 1|Lab Nmap' && !(await q.locator('.notice').count()), `al agregarla sale sola como Principal y el aviso se va (${t2.join(', ')})`);
+    }
+    ok(!q.errs.length && await noScroll(q) === 390, `${scheme}: sin errores ni scroll ` + q.errs.join('|')); await q.close();
+  }
 }
 // ---------- 7. hojas en iPhone ----------
 console.log('\nHojas en iPhone');

@@ -289,6 +289,12 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 - Hoy: «Principales 1/2», la vencida con borde y texto en rojo («Vencida desde el 15 oct»). Mañana muestra lo que saldrá solo. El día se gana con todas hechas (puntos, Plan B, Semana).
 - Cubierto por `tests/run.mjs` («Principales automáticas» y los casos de vencida).
 
+### Aviso de proyecto sin tareas *(fase 2 · hecha, falta publicar)*
+
+**Problema:** un proyecto activo sin tareas pendientes no saca Principal y nada lo dice; podían pasar días sin avanzar ese frente sin notarlo.
+
+**Cambio:** en Hoy, el aviso de menor prioridad dice «X no tiene tareas. Sin ellas no sale su Principal.» con el botón **Agregar**, que abre Frentes con el campo de nueva tarea de ese proyecto listo. Las ideas congeladas no cuentan como tareas. Al agregar una, sale sola como Principal si ese día toca.
+
 ### Tarea 4: IA dentro de la app *(media)*
 
 Usar la capability `sample` (declararla: `sample:{}`). Se llama solo cuando el usuario toca un botón; nunca al cargar.
