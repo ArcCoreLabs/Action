@@ -427,6 +427,8 @@ ul.help{font-size:14px}
 .day-line{margin-top:-2px}
 .day-line .dash{min-height:36px;font-size:13px}
 .opt[disabled]{opacity:.45;cursor:not-allowed}
+.main-task.late{box-shadow:inset 3px 0 0 var(--warn)} /* Principal vencida: sigue en Hoy hasta que la hagas */
+.late-txt{color:var(--warn);font-weight:600}
 /* ---------- calma: menos cosas que llaman la atención ---------- */
 .info{border-color:transparent;color:var(--faint);opacity:.75} /* la ayuda sigue ahí, pero ya no parece una alerta */
 .info:hover{color:var(--accent);border-color:transparent;opacity:1}
@@ -537,6 +539,11 @@ const frozen = () => S.fronts.filter(f => f.status !== "active").sort(byOrder);
 const front = id => S.fronts.find(f => f.id === id);
 const task = id => S.tasks.find(t => t.id === id);
 const crit = d => S.tasks.find(t => t.date === d && t.slot === "critical");
+const crits = d => S.tasks.filter(t => t.date === d && t.slot === "critical").sort((a,b) => byOrder(front(a.frontId) || {}, front(b.frontId) || {})); // una Principal por proyecto (máx. 2)
+const critOf = (d, fid) => S.tasks.find(t => t.date === d && t.slot === "critical" && (t.frontId || null) === (fid || null));
+const dayWon = d => { const cs = crits(d); return cs.length > 0 && cs.every(t => t.done); }; // ganado: todas las Principales del día hechas
+const dueOn = (f, d) => { if (!f || isHabitFront(f) || paused(f, d)) return false; const h = S.habits.find(x => x.frontId === f.id); return h ? daysOn(h, d) : [1,2,3,4,5].includes(dow(d)); }; // días del hábito del proyecto; sin hábito, de lunes a viernes
+const nextTask = fid => S.tasks.filter(t => t.frontId === fid && !t.done && !t.slot && !t.someday).sort((a,b) => (a.created||0) - (b.created||0))[0]; // la siguiente en el orden en que las escribiste
 const secs = d => S.tasks.filter(t => t.date === d && t.slot === "secondary").sort((a,b) => (a.created||0) - (b.created||0));
 const inbox = () => S.tasks.filter(t => !t.frontId && !t.done && !t.slot && !t.someday).sort((a,b) => (a.created||0) - (b.created||0));
 const ideas = () => S.tasks.filter(t => !t.frontId && !t.done && !t.slot && t.someday).sort((a,b) => String(b.someday).localeCompare(String(a.someday)) || (b.created||0) - (a.created||0)); // notas congeladas «para algún día», la más reciente arriba
@@ -573,10 +580,10 @@ function missedRun(h){ // cuántos días programados seguidos se fallaron antes 
   return n;
 }
 function dayState(d){
-  const c = crit(d);
-  if (c && c.done) return "win";
-  if (S.habits.some(h => (h.log || {})[d])) return "min";
-  if (d < today() && (c || S.tasks.some(t => (t.missed || []).includes(d)) || S.habits.some(h => scheduled(h, d) && (!h.created || d >= h.created)))) return "miss"; // una Principal fallada que se movió sigue en rojo
+  const cs = crits(d);
+  if (cs.length && cs.every(t => t.done)) return "win";
+  if (cs.some(t => t.done) || S.habits.some(h => (h.log || {})[d])) return "min";
+  if (d < today() && (cs.length || S.tasks.some(t => (t.missed || []).includes(d)) || S.habits.some(h => scheduled(h, d) && (!h.created || d >= h.created)))) return "miss"; // una Principal fallada que se movió sigue en rojo
   return "none";
 }
 function goalWeek(g){ // 0 = aún no empieza
@@ -604,7 +611,7 @@ function forestDays(g, all){ // all: todos los días; si no, el bloque de 364 qu
   const lvl = forestMap(g), t = today(), n = diffDays(g.start, g.deadline) + 1, f = front(g.frontId);
   const hs = S.habits.filter(h => h.frontId === g.frontId);
   const missed = new Set(S.tasks.filter(x => x.frontId === g.frontId).flatMap(x => x.missed || []));
-  const due = d => { if (paused(f, d)) return false; const c = crit(d); return (c && c.frontId === g.frontId) || missed.has(d) || hs.some(h => daysOn(h, d) && (!h.created || d >= h.created)); };
+  const due = d => { if (paused(f, d)) return false; return crits(d).some(c => c.frontId === g.frontId) || missed.has(d) || hs.some(h => daysOn(h, d) && (!h.created || d >= h.created)); };
   const days = []; let miss = 0, wilted = null;
   for (let i = 0; i < n; i++){
     const d = addDays(g.start, i), x = {d, i, lvl:lvl[d] || 0, state:"rest"};
@@ -708,29 +715,47 @@ function forestBlock(g){
 /* ================= asignar tareas ================= */
 function assign(id, date, slot, quiet){
   const t = task(id); if (!t) return false;
-  if (slot === "critical"){
-    const cur = crit(date);
-    if (cur && cur.id !== id && cur.done){ toast("La principal de ese día ya está hecha. Añade esta como extra."); return false; }
+  if (slot === "critical"){ // una Principal por proyecto: reemplaza la de su frente
+    const cur = critOf(date, t.frontId);
+    if (cur && cur.id !== id && cur.done){ toast("La Principal de ese frente ya está hecha ese día. Añade esta como extra."); return false; }
     if (cur && cur.id !== id) put("tasks", {...cur, date:null, slot:null});
+    else if (!cur && crits(date).filter(x => x.id !== id).length >= 2){ toast("Ese día ya tiene 2 Principales. Es el máximo."); return false; }
   } else {
     const s = secs(date).filter(x => x.id !== id);
     if (s.length >= 2){ toast("Ese día ya tiene 2 extras. Es el máximo."); return false; }
   }
-  put("tasks", {...t, ...keepMiss(t), date, slot, done:false, doneAt:null});
+  const {since, ...t0} = t; put("tasks", {...t0, ...keepMiss(t), date, slot, done:false, doneAt:null});
   if (!quiet){
     const when = date === today() ? "hoy" : date === addDays(today(),1) ? "mañana" : fmtShort(date);
     toast(slot === "critical" ? `Principal de ${when} lista.` : `Extra de ${when} listo.`);
   }
   return true;
 }
-function unassign(id){ const t = task(id); if (t) put("tasks", {...t, ...keepMiss(t), date:null, slot:null}); }
+const PLANNED = new Set(); // proyectos ya llenados hoy en esta sesión (evita repetir la escritura mientras llega la respuesta)
+function autoPlan(){ // la Principal de cada proyecto se llena sola el día que le toca; la que no cumpliste sigue, en rojo, hasta que la hagas
+  if (!loaded()) return;
+  const d = today();
+  projects().forEach(f => {
+    const k = d + "|" + f.id; if (PLANNED.has(k) || critOf(d, f.id)) return;
+    const late = S.tasks.filter(t => t.frontId === f.id && t.slot === "critical" && !t.done && t.date && t.date < d).sort((a,b) => a.date.localeCompare(b.date));
+    if (late.length){ PLANNED.add(k); const t = late[0];
+      put("tasks", {...t, ...(dueOn(f, t.date) ? {missed:[...(t.missed || []), t.date]} : {}), since:t.since || t.date, date:d}); // vencida: pasa a hoy y el día fallado queda guardado
+      late.slice(1).forEach(x => put("tasks", {...x, ...(dueOn(f, x.date) ? {missed:[...(x.missed || []), x.date]} : {}), date:null, slot:null}));
+      return; }
+    if (f.planSkip === d || !dueOn(f, d)) return;
+    const t = nextTask(f.id); if (t){ PLANNED.add(k); put("tasks", {...t, slot:"critical", date:d, done:false, doneAt:null}); }
+  });
+}
+let planT; const planSoon = () => { clearTimeout(planT); planT = setTimeout(autoPlan, 300); };
+function unassign(id){ const t = task(id); if (!t) return; const {since, ...t0} = t; put("tasks", {...t0, ...keepMiss(t), date:null, slot:null});
+  const f = t.slot === "critical" && t.date === today() && front(t.frontId); if (f) put("fronts", {...f, planSkip:today()}); } // la quitaste tú: hoy no se vuelve a llenar sola
 function toggleDone(id){
   const t = task(id); if (!t) return;
-  const done = !t.done, win = done && t.slot === "critical" && t.date === today();
-  const grow = done ? forestGrow(t.frontId, win ? 3 : 2) : "";
+  const p = t.slot === "critical" && t.date === today(), done = !t.done, win = done && p && crits(today()).every(x => x.id === t.id || x.done);
+  const grow = done ? forestGrow(t.frontId, p ? 3 : 2) : "";
   put("tasks", {...t, done, doneAt: done ? today() : null});
   const hs = syncHabit(t, done);
-  const msg = [win ? "Día ganado." : "", done && hs.length ? `Hábito ${hs.join(" y ")} marcado.` : ""].filter(Boolean).join(" ") + grow;
+  const msg = [win ? "Día ganado." : done && p ? "Principal hecha. Te falta la otra." : "", done && hs.length ? `Hábito ${hs.join(" y ")} marcado.` : ""].filter(Boolean).join(" ") + grow;
   if (msg.trim()) toast(msg.trim());
 }
 function syncHabit(t, done){ // al completar una tarea de un frente, marca el hábito ligado a ese frente
@@ -801,10 +826,10 @@ function taskRow(t, opts = {}){
 /* ---------- tu bloque y el Plan B (debajo de la fecha, de lunes a viernes) ---------- */
 const fmtHour = hm => { const [h, m] = String(hm).split(":").map(Number); const x = new Date(); x.setHours(h, m || 0, 0, 0); return new Intl.DateTimeFormat("es-CO", {hour:"numeric", minute:"2-digit"}).format(x); };
 function dayLine(){ // "block" · "planb" · "pick" · "" (fin de semana)
-  const d = today(), w = dow(d), st = settings(), c = crit(d);
+  const d = today(), w = dow(d), st = settings(), won = dayWon(d);
   if (w === 0 || w === 6) return {k:"", html:""};
   const now = new Date(), hm = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
-  if (st.planBTime && hm >= st.planBTime && !(c && c.done)) return {k:"planb", html:'<p class="notice warn day-line"><span>Plan B activo: hoy solo el mínimo</span></p>'};
+  if (st.planBTime && hm >= st.planBTime && !won) return {k:"planb", html:'<p class="notice warn day-line"><span>Plan B activo: hoy solo el mínimo</span></p>'};
   if (st.fixedTime) return {k:"block", html:`<p class="notice day-line"><span>Tu bloque: ${esc(fmtHour(st.fixedTime))}</span></p>`};
   return {k:"pick", html:""}; // sin hora fija no se pide nada aquí: se elige en Ajustes
 }
@@ -813,13 +838,13 @@ function dayLine(){ // "block" · "planb" · "pick" · "" (fin de semana)
 const VIEWS = {};
 
 VIEWS.hoy = function(){
-  const d = today(), c = crit(d), s = secs(d), hs = habits();
-  const cT = crit(addDays(d, 1));
+  const d = today(), cs = crits(d), s = secs(d), hs = habits(), tm = addDays(d, 1);
+  const cT = crits(tm), soon = cT.length ? cT : projects().filter(f => dueOn(f, tm)).map(f => cs.find(x => x.frontId === f.id && !x.done) || nextTask(f.id)).filter(Boolean); // mañana: lo que ya está o lo que saldrá solo
 
   const nt = []; // de todos los avisos se muestra solo el primero: van en orden de importancia
   const names = list => list.map(h => esc(h.name)).join(" y ");
   const pend = hs.filter(h => scheduled(h, d) && !(h.log || {})[d]);
-  const wilting = active().map(f => forestGoal(f.id)).filter(g => g && forestWilting(g) && (pend.some(h => h.frontId === g.frontId) || (c && !c.done && c.frontId === g.frontId)));
+  const wilting = active().map(f => forestGoal(f.id)).filter(g => g && forestWilting(g) && (pend.some(h => h.frontId === g.frontId) || cs.some(c => !c.done && c.frontId === g.frontId)));
   const alarm = pend.filter(h => missedRun(h) >= 2), once = pend.filter(h => missedRun(h) === 1 && !wilting.some(g => g.frontId === h.frontId));
   if (alarm.length) nt.push(`<p class="notice warn"><span>Llevas 2 días sin cumplir <b>${names(alarm)}</b>. Hoy haz al menos el mínimo.</span></p>`);
   if (!alarm.length && wilting.length){
@@ -827,19 +852,19 @@ VIEWS.hoy = function(){
     nt.push(`<p class="notice acc"><span>${one ? "Tu árbol" : "Tus árboles"} de <b>${wilting.map(g => esc(front(g.frontId).name)).join(" y ")}</b> se ${one ? "está" : "están"} marchitando. ${one ? (canMin ? "Hoy haz al menos el mínimo y lo salvas." : "Hoy termina la Principal y lo salvas.") : "Hoy avanza en cada uno y los salvas."}</span></p>`);
   }
   if (dow(d) === 0 && !(S.reviews.find(r => r.id === monday(d)) || {}).closed) nt.push(`<p class="notice acc"><span>Hoy toca la revisión semanal.</span><button class="text-btn" data-act="nav" data-v="semana">Abrir</button></p>`);
-  const old = S.tasks.filter(t => t.slot && t.date && t.date < d && !t.done).sort((a,b) => a.date.localeCompare(b.date));
+  const old = S.tasks.filter(t => t.slot && t.date && t.date < d && !t.done && !(t.slot === "critical" && projects().some(f => f.id === t.frontId))).sort((a,b) => a.date.localeCompare(b.date));
   if (old.length) nt.push(`<p class="notice"><span>Pendiente: <b>${esc(old[0].title)}</b>${old.length > 1 ? ` (y ${old.length - 1} más)` : ""}</span><button class="text-btn" data-act="carry" data-id="${old[0].id}">Pasar a hoy</button><button class="text-btn muted" data-act="unassign" data-id="${old[0].id}">Quitar</button></p>`);
   if (!alarm.length && once.length) nt.push(`<p class="notice acc"><span>La última vez no cumpliste <b>${names(once)}</b>. Hoy no falles: haz al menos el mínimo.</span></p>`);
 
-  let main;
-  if (c){
-    const f = front(c.frontId);
-    main = `<div class="main-task ${c.done ? "done" : ""}">
+  let main; const won = dayWon(d);
+  const pRow = c => { const f = front(c.frontId), late = !c.done && c.since && c.since < d; // vencida: sigue aquí, en rojo, hasta que la hagas
+    return `<div class="main-task ${c.done ? "done" : ""} ${late ? "late" : ""}">
       <button class="check big ${c.done ? "on" : ""}" data-act="done" data-id="${c.id}" aria-label="${c.done ? "Desmarcar" : "Marcar hecha"}">${ICON.check}</button>
-      <div class="tmain"><span class="mt-title">${esc(c.title)}</span><span class="tmeta">${c.done ? '<span class="ok">Día ganado</span>' : join([f ? esc(f.name) : "", c.minutes ? `${c.minutes} min` : ""])}</span></div>
+      <div class="tmain"><span class="mt-title">${esc(c.title)}</span><span class="tmeta">${c.done ? `<span class="ok">${won ? "Día ganado" : "Hecha"}</span>` : join([late ? `<span class="late-txt">Vencida desde el ${fmtShort(c.since)}</span>` : "", f ? esc(f.name) : "", c.minutes ? `${c.minutes} min` : ""])}</span></div>
       ${c.done ? "" : `<button class="play" data-act="focus" data-id="${c.id}" aria-label="Empezar temporizador">${PLAY}</button>`}
-      <button class="more" data-act="task-sheet" data-id="${c.id}" aria-label="Opciones">${ICON.more}</button></div>`;
-  } else main = S.fronts.length ? dash("Elegir tarea principal", "pick", `data-date="${d}" data-slot="critical"`) : dash("Crear tu primer frente", "front-new");
+      <button class="more" data-act="task-sheet" data-id="${c.id}" aria-label="Opciones">${ICON.more}</button></div>`; };
+  if (cs.length) main = `<div class="stack" style="gap:8px">${cs.map(pRow).join("")}</div>`;
+  else main = S.fronts.length ? dash("Elegir tarea principal", "pick", `data-date="${d}" data-slot="critical"`) : dash("Crear tu primer frente", "front-new");
 
   const extras = s.map(t => taskRow(t, {focus:true, noWhen:true, showFront:true})).join("") + (s.length < 2 ? dash("Añadir extra", "pick", `data-date="${d}" data-slot="secondary" style="${s.length ? "margin-top:8px" : ""}"`) : "");
 
@@ -864,13 +889,13 @@ VIEWS.hoy = function(){
   <div class="sec-head page"><h1 class="date-title">${cap(fmt(d, {weekday:"long", day:"numeric", month:"long"}))}</h1></div>
   ${dayLine().html}
   ${nt.length ? `<div class="notices">${nt[0]}</div>` : ""}
-  <section class="block">${head("Principal", "principal")}${main}</section>
-  ${c || s.length ? `<section class="block">${head("Extras", "extras", `<span class="count">${s.length}/2</span>`)}<div class="list">${extras}</div></section>` : ""}
+  <section class="block">${head(cs.length > 1 ? "Principales" : "Principal", "principal", cs.length > 1 ? `<span class="count ${won ? "ok" : ""}">${cs.filter(x => x.done).length}/${cs.length}</span>` : "")}${main}</section>
+  ${cs.length || s.length ? `<section class="block">${head("Extras", "extras", `<span class="count">${s.length}/2</span>`)}<div class="list">${extras}</div></section>` : ""}
   <section class="block">${head("Hábitos", "habitos", hs.length ? '<button class="text-btn muted" data-act="habits-edit">Editar</button>' : "")}
     ${hs.length ? (hrows ? `<div class="list">${hrows}</div>` : '<p class="empty">Hoy no toca ningún hábito.</p>') : dash("Crear hábito", "habit-new")}</section>
   <section class="block">${head("Semana", "dots")}<div class="dots">${dots}</div></section>
   <section class="block">${head("Mañana", "manana")}
-    ${cT ? `<div class="trow plain"><div class="tmain"><span class="ttitle">${esc(cT.title)}</span><span class="tmeta">Principal de mañana</span></div><button class="text-btn" data-act="night">Cambiar</button></div>` : dash("Planear mañana", "night")}</section>`;
+    ${soon.length ? `<div class="list">${soon.map(t => `<div class="trow plain"><div class="tmain"><span class="ttitle">${esc(t.title)}</span><span class="tmeta">${join([(front(t.frontId) || {}).name ? esc(front(t.frontId).name) : "", cT.length ? "Principal de mañana" : "Saldrá sola mañana"])}</span></div></div>`).join("")}</div><button class="text-btn muted" data-act="night" style="padding-left:0">Planear mañana</button>` : dash("Planear mañana", "night")}</section>`;
 };
 
 VIEWS.bandeja = function(){
@@ -979,7 +1004,7 @@ VIEWS.semana = function(){
   const d = today(), mon = monday(d), sun = addDays(mon, 6);
   const r = S.reviews.find(x => x.id === mon) || {};
   const days = Array.from({length:7}, (_, i) => addDays(mon, i)).filter(x => x <= d);
-  const wins = days.filter(x => { const c = crit(x); return c && c.done; }).length;
+  const wins = days.filter(dayWon).length;
   const hdays = days.filter(x => S.habits.some(h => (h.log || {})[x])).length;
   const fmin = days.reduce((a, x) => a + ((S.focus.days || {})[x] || 0), 0);
   const act = active();
@@ -1015,7 +1040,7 @@ VIEWS.semana = function(){
 
 /* ----- ayuda "!" de cada apartado ----- */
 const HELP = {
-  principal:["Principal", ["La tarea más importante del día. Solo una.", "Elígela la noche anterior en <b>Mañana</b>.", "Toca <b>▶</b> para empezar un temporizador. Si estás cansado, empieza con 10 minutos.", "Marca la casilla al terminar: con eso el día ya cuenta.", "Debajo de la fecha ves <b>tu bloque</b>, de lunes a viernes. Si pasa tu hora de <b>Plan B</b> sin la Principal hecha, la app te dice: hoy solo el mínimo. La racha sigue."]],
+  principal:["Principal", ["Una por cada proyecto activo (máximo 2). Salen solas los días de su hábito (sin hábito, de lunes a viernes): la siguiente tarea de su lista.", "Si no la cumples no se borra: sigue aquí, en rojo, como vencida, hasta que la hagas.", "Para cambiarla, toca <b>⋯</b>. Si la quitas, ese día no vuelve a salir sola.", "Toca <b>▶</b> para empezar un temporizador. Si estás cansado, empieza con 10 minutos.", "El día se gana cuando las haces todas.", "Debajo de la fecha ves <b>tu bloque</b>, de lunes a viernes. Si pasa tu hora de <b>Plan B</b> sin la Principal hecha, la app te dice: hoy solo el mínimo. La racha sigue."]],
   extras:["Extras", ["Hasta 2 tareas más, opcionales.", "Hazlas solo después de la principal."]],
   habitos:["Hábitos", ["La tarea dice <b>qué</b> hiciste; el hábito dice si fuiste <b>constante</b>.", "Si tiene tiempo, toca <b>▶</b>: al terminar el tiempo se marca solo. Si paras antes y pasaste el mínimo, cuenta como mínimo.", "¿Lo hiciste sin temporizador? Marca la casilla. En un día malo, toca <b>Solo mínimo</b>: la racha sigue.", "Un hábito ligado a un proyecto se marca solo cuando terminas una tarea de ese proyecto.", "Si te saltas un día programado, la app te avisa: nunca falles dos seguidos.", "Solo aparecen los días que tú eliges."]],
   dots:["Semana", ["Un punto por día.", "<b>Verde</b>: terminaste la principal. Día ganado.", "<b>Borde verde</b>: no terminaste la principal, pero cumpliste el mínimo de un hábito. La racha sigue.", "<b>Borde rojo</b>: ese día no hiciste ni la principal ni el mínimo."]],
@@ -1514,7 +1539,7 @@ function habitQuick(fid, asHabit){
 /* ----- plan de noche ----- */
 const NP = { step:0, p1:null, p2:[] };
 function nightOpen(){
-  const tm = addDays(today(), 1), c = crit(tm);
+  const tm = addDays(today(), 1), c = crits(tm)[0];
   NP.step = 0; NP.p1 = c ? c.id : null; NP.p2 = secs(tm).map(t => t.id);
   openModal(nightRender);
 }
@@ -1655,7 +1680,7 @@ const A = {
   move(d){ const t = task(d.id); if (!t) return; const f = front(d.front), {someday, ...rest} = t; put("tasks", {...rest, frontId: d.front || null, ...(f && f.status !== "active" ? {...keepMiss(t), date:null, slot:null} : {})}); if (!d.stay) closeModal(); toast(f ? `Movida a ${f.name}.` : "De vuelta en la Bandeja."); },
   assign(d){ if (assign(d.id, d.date, d.slot)) closeModal(); },
   unassign(d){ unassign(d.id); closeModal(); },
-  carry(d){ const t = task(d.id); if (!t) return; const slot = t.slot === "critical" && !crit(today()) ? "critical" : "secondary"; assign(d.id, today(), slot); },
+  carry(d){ const t = task(d.id); if (!t) return; const slot = t.slot === "critical" && !critOf(today(), t.frontId) && crits(today()).length < 2 ? "critical" : "secondary"; assign(d.id, today(), slot); },
   pick(d){ pickSheet(d.date, d.slot); },
   "pick-do"(d){ if (assign(d.id, d.date, d.slot)) closeModal(); },
   "idea-freeze"(d){ const t = task(d.id); if (!t || t.done) return; put("tasks", {...t, ...keepMiss(t), frontId:null, slot:null, date:null, someday:today()}); if (!d.stay) closeModal(); toast("Congelada. La ves en Frentes → Congelados."); }, // una nota hecha no es una idea
@@ -1684,8 +1709,9 @@ const A = {
     else { if (NP.p2.includes(d.id)) NP.p2 = NP.p2.filter(x => x !== d.id); else if (NP.p2.length < 2) NP.p2.push(d.id); else toast("Máximo 2 extras."); } sched(); },
   "np-save"(){
     const tm = addDays(today(), 1);
-    S.tasks.filter(t => t.date === tm && t.slot && t.id !== NP.p1 && !NP.p2.includes(t.id)).forEach(t => put("tasks", {...t, date:null, slot:null}));
-    const p1 = task(NP.p1); if (p1) put("tasks", {...p1, date:tm, slot:"critical", done:false});
+    const p1 = task(NP.p1), keep = t => t.id === NP.p1 || NP.p2.includes(t.id) || (t.slot === "critical" && p1 && (t.frontId || null) !== (p1.frontId || null)); // la Principal de otro proyecto se queda
+    S.tasks.filter(t => t.date === tm && t.slot && !keep(t)).forEach(t => put("tasks", {...t, date:null, slot:null}));
+    if (p1) put("tasks", {...p1, date:tm, slot:"critical", done:false});
     NP.p2.forEach(id => { const t = task(id); if (t) put("tasks", {...t, date:tm, slot:"secondary", done:false}); });
     NP.step = 3; sched();
   },
@@ -1758,7 +1784,7 @@ const FORMS = {
     const t = {id, title:v, frontId:$("#pn-front").value || null, minutes:+$("#pn-min").value, slot:null, date:null, done:false, created:Date.now()};
     const date = f.dataset.date, slot = f.dataset.slot;
     if (slot === "secondary" && secs(date).length >= 2){ toast("Ese día ya tiene 2 extras."); return; }
-    if (slot === "critical"){ const cur = crit(date); if (cur && cur.done){ toast("La principal de ese día ya está hecha. Créala como extra."); return; } if (cur) put("tasks", {...cur, date:null, slot:null}); }
+    if (slot === "critical"){ const cur = critOf(date, t.frontId); if (cur && cur.done){ toast("La Principal de ese frente ya está hecha. Créala como extra."); return; } if (cur) put("tasks", {...cur, date:null, slot:null}); else if (crits(date).length >= 2){ toast("Ese día ya tiene 2 Principales. Es el máximo."); return; } }
     put("tasks", {...t, date, slot}); closeModal(); toast("Creada y programada."); },
   "wz-task"(f){ const i = $("#wz-task"), v = i.value.trim(); if (!v) return; W.tasks.push({title:v, minutes:+$("#wz-min").value}); wzRedraw(); },
   "habit-quick"(f){ const fr = front(f.dataset.front); if (!fr) return; const v = readHabitFields("q");
@@ -1845,7 +1871,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden && F.
 
 /* ================= arranque ================= */
 let lastDay = today(), lastLine = "";
-setInterval(() => { const k = mode === "connecting" ? "" : dayLine().k; if (today() !== lastDay || k !== lastLine){ lastDay = today(); lastLine = k; sched(); } }, 60000); // cambio de día y paso al Plan B
+setInterval(() => { const k = mode === "connecting" ? "" : dayLine().k; if (today() !== lastDay || k !== lastLine){ lastDay = today(); lastLine = k; sched(); planSoon(); } }, 60000); // cambio de día y paso al Plan B
 async function init(){
   render();
   try { if (window.claude && window.claude.use) window.claude.use("downloads").then(x => { dl = x || null; }, () => {}); } catch(e){}
@@ -1855,7 +1881,7 @@ async function init(){
   db = d; mode = "db";
   const onErr = e => { if (e && e.code === "revoked") toast("Se perdió el acceso. Recarga la página."); else toast("Se interrumpió la sincronización. Recarga la página."); };
   ["tasks","fronts","goals","habits","reviews"].forEach(c => {
-    db.collection(c).onSnapshot(s => { S[c] = s.docs.map(x => ({id:x.id, ...x.data()})); ready.add(c); sched(); }, onErr);
+    db.collection(c).onSnapshot(s => { S[c] = s.docs.map(x => ({id:x.id, ...x.data()})); ready.add(c); sched(); planSoon(); }, onErr);
   });
   ["settings","focus"].forEach(k => {
     db.doc("meta/" + k).onSnapshot(s => { S[k] = s.exists ? {...s.data()} : (k === "focus" ? {days:{}} : {}); ready.add(k); sched(); }, onErr);

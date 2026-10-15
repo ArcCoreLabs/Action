@@ -160,23 +160,25 @@ for (const scheme of ['light', 'dark']){
 // ---------- 4. arreglos de la revisión ----------
 console.log('\nArreglos de la revisión');
 for (const scheme of ['light', 'dark']){
-  // frente sin hábito: Principal de ayer sin hacer → "Pasar a hoy" no borra el marchito; al terminarla se salva
-  for (const act of ['carry', 'unassign']){
+  // frente sin hábito: la Principal de ayer sin hacer pasa sola a hoy, en rojo; el marchito se queda; al terminarla se salva
+  for (const act of ['done', 'unassign']){
     const start = add(TODAY, -6), seed = seedGoal({ start, days:28, habit:false });
     for (let i = 0; i < 6; i++) seed[`tasks/p${i}`] = { title:'Principal ' + i, frontId:'f1', minutes:45, slot:'critical', date:add(start, i), done:i < 5, doneAt:i < 5 ? add(start, i) : null, created:i };
-    const p = await open(scheme, seed, 360);
-    const btn = await p.evaluate(() => { const b = [...document.querySelectorAll('.notice .text-btn')].map(x => x.getBoundingClientRect().top); return b.length === 2 && Math.abs(b[0] - b[1]) < 2; });
-    ok(btn, `${scheme}: a 360 px "Pasar a hoy" y "Quitar" quedan juntos`);
-    await p.click(`.notice [data-act=${act}]`); await p.waitForTimeout(80); await nav(p, 'metas');
-    let lb = await p.locator('.forest-count').textContent();
-    ok(lb.includes('1 marchito'), `${scheme}: "${act === 'carry' ? 'Pasar a hoy' : 'Quitar'}" no borra el marchito ("${lb}")`);
-    if (act === 'carry'){
-      await nav(p, 'hoy'); const n = await p.locator('.notices').textContent();
+    const p = await open(scheme, seed, 360); await p.waitForTimeout(500);
+    ok(/Vencida desde el/.test(await p.locator('.main-task.late').textContent().catch(() => '')) && await p.locator('.notice [data-act=carry]').count() === 0, `${scheme}: la Principal vencida pasa sola a hoy, en rojo`);
+    await nav(p, 'metas'); let lb = await p.locator('.forest-count').textContent();
+    ok(lb.includes('1 marchito'), `${scheme}: pasarla a hoy no borra el marchito ("${lb}")`); await nav(p, 'hoy');
+    if (act === 'done'){
+      const n = await p.locator('.notices').textContent();
       ok(/Hoy termina la Principal y lo salvas/.test(n), `${scheme}: sin hábito, el aviso pide terminar la Principal`);
       await p.click('.main-task [data-act=done]'); const tt = await toastText(p);
       const w = await p.locator('.toast').evaluate(e => e.getBoundingClientRect().width);
       ok(/Salvaste/.test(tt) && w > 250, `${scheme}: al terminarla se salva y el aviso usa el ancho ("${tt}", ${Math.round(w)} px)`);
       await nav(p, 'metas'); lb = await p.locator('.forest-count').textContent(); ok(lb.includes('1 salvado') && !lb.includes('marchito'), `${scheme}: queda salvado ("${lb}")`);
+    } else {
+      await p.click('.main-task [data-act=task-sheet]'); await p.click('[data-act=unassign]'); await p.waitForTimeout(500);
+      const s2 = await store(p); ok(!s2.tasks.find(t => t.id === 'p5').slot && s2.fronts[0].planSkip === TODAY && await p.locator('.main-task').count() === 0, `${scheme}: si la quitas, hoy no vuelve a salir sola`);
+      await nav(p, 'metas'); lb = await p.locator('.forest-count').textContent(); ok(lb.includes('1 marchito'), `${scheme}: quitarla no borra el marchito ("${lb}")`);
     }
     ok(!p.errs.length && await noScroll(p) === 360, `${scheme}: sin errores ni scroll a 360 px`); await p.close();
   }
@@ -722,8 +724,9 @@ console.log('\nCalma visual');
   ok(await p.locator('.notices .notice').count() === 1 && /Llevas 2 días sin cumplir/.test(await p.locator('.notices').textContent()), 'Hoy muestra un solo aviso: el más importante');
   ok(!/Extras/.test(await p.locator('#view').textContent()), 'sin Principal no aparece Extras');
   ok(await p.evaluate(() => getComputedStyle(document.querySelector('.info')).borderTopColor) === 'rgba(0, 0, 0, 0)', 'los «!» no tienen círculo');
-  await p.click('[data-act=hcheck]'); await p.waitForTimeout(80);
-  const nt2 = await p.locator('.notices').textContent(); ok(/Pendiente: Leer guía \(y 1 más\)/.test(nt2) && await p.locator('.notices .notice').count() === 1, `resuelto el aviso, queda una sola línea de pendientes ("${nt2}")`);
+  await p.click('[data-act=hcheck]'); await p.waitForTimeout(500);
+  const nt2 = await p.locator('.notices').textContent(), nl = await p.locator('.notices .notice').count(), late = await p.locator('.main-task.late').count();
+  ok(/Pendiente: Leer guía/.test(nt2) && nl === 1 && late === 1, `resuelto el aviso, queda una línea de pendientes y la Principal vencida está en Hoy ("${nt2}", ${nl} avisos, ${late} vencidas)`);
   await nav(p, 'metas'); const g = p.locator('.goal');
   ok(await g.locator('> .list .trow').count() === 1 && /Todas las semanas \(10\)/.test(await g.textContent()), 'Metas muestra solo la semana actual y pliega las demás');
   ok(!p.errs.length && await noScroll(p) === 390, 'sin errores ni scroll ' + p.errs.join('|')); await p.close();
@@ -734,6 +737,33 @@ console.log('\nCalma visual');
   await p.click('[data-act=front-new]:not([data-frozen])'); await p.fill('#wz-name', 'Jr Penetration Tester'); await p.click('[data-act=wz-next]'); await p.click('[data-act=wz-next]');
   ok(await p.inputValue('#g-title') === 'Completar Jr Penetration Tester' && /De aquí salen sus semanas y su bosque/.test(await p.locator('.sheet').textContent()), 'el paso del objetivo trae una propuesta y explica que crea el bosque');
   await p.click('[data-act=wz-skip]'); await p.click('[data-act=wz-back]'); ok(await p.inputValue('#g-title') === '', 'si eliges «Sin objetivo», la propuesta no vuelve'); await p.close();
+}
+// ---------- 6f. Principales automáticas ----------
+console.log('\nPrincipales automáticas');
+{ // TODAY es jueves. CCFA: hábito de lunes a viernes. JPT: hábito de jueves a domingo. Cada uno saca solo su siguiente tarea.
+  const seed = { 'fronts/a':{ name:'CCFA', status:'active', order:1, created:1 }, 'fronts/b':{ name:'JPT', status:'active', order:2, created:2 },
+    'habits/ha':{ name:'CCFA', days:[1,2,3,4,5], frontId:'a', log:{}, order:1, created:add(TODAY, -7) }, 'habits/hb':{ name:'JPT', days:[4,5,6,0], frontId:'b', log:{}, order:2, created:add(TODAY, -7) },
+    'tasks/a1':{ title:'Módulo 1', frontId:'a', minutes:45, slot:null, date:null, done:false, created:1 }, 'tasks/a2':{ title:'Módulo 2', frontId:'a', minutes:45, slot:null, date:null, done:false, created:2 },
+    'tasks/b2':{ title:'Lab Web', frontId:'b', minutes:60, slot:null, date:null, done:false, created:5 }, 'tasks/b1':{ title:'Lab Kill Chain', frontId:'b', minutes:60, slot:null, date:null, done:false, created:4 },
+    'meta/settings':{}, 'meta/focus':{ days:{} } };
+  for (const scheme of ['light', 'dark']){
+    const p = await open(scheme, seed); await p.waitForTimeout(500);
+    const titles = await p.locator('.main-task .mt-title').allTextContents();
+    ok(titles.join('|') === 'Módulo 1|Lab Kill Chain', `${scheme}: salen solas 2 Principales, la siguiente tarea de cada proyecto (${titles.join(', ')})`);
+    ok(/Principales\s*0\/2/.test(await p.locator('#view').textContent()), `${scheme}: el título dice Principales 0/2`);
+    await p.screenshot({ path:path.join(out, `principales-${scheme}.png`) });
+    await p.click('.main-task:has-text("Módulo 1") [data-act=done]'); let tt = await toastText(p);
+    ok(/Principal hecha\. Te falta la otra\./.test(tt) && await p.evaluate(() => document.querySelectorAll('.dot i')[3].className) !== 'win', `${scheme}: con una hecha el día no está ganado ("${tt}")`);
+    await p.waitForTimeout(300); await p.click('.main-task:has-text("Lab Kill Chain") [data-act=done]'); tt = await toastText(p); await p.waitForTimeout(150);
+    ok(/Día ganado/.test(tt) && await p.evaluate(() => document.querySelectorAll('.dot i')[3].className) === 'win', `${scheme}: con las dos hechas el día se gana ("${tt}")`);
+    await p.waitForTimeout(500); ok((await p.locator('.main-task').count()) === 2, `${scheme}: hechas no se reemplazan por otra el mismo día`);
+    ok(!p.errs.length && await noScroll(p) === 390, `${scheme}: sin errores ni scroll ` + p.errs.join('|')); await p.close();
+  }
+  // lunes: JPT no toca (su hábito es de jueves a domingo), solo sale CCFA; mañana muestra lo que saldrá solo
+  const p = await b.newPage({ viewport:{ width:390, height:860 } }); await p.clock.setFixedTime(new Date('2026-10-12T09:00:00')); await p.addInitScript(s => { window.__SEED = s; }, seed);
+  await p.goto('file://' + page); await p.waitForSelector('.sec-head'); await p.waitForTimeout(500);
+  ok((await p.locator('.main-task .mt-title').allTextContents()).join('|') === 'Módulo 1', 'un proyecto solo sale los días de su hábito');
+  await p.close();
 }
 // ---------- 7. hojas en iPhone ----------
 console.log('\nHojas en iPhone');

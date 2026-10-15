@@ -38,10 +38,10 @@ Cada fase termina con la app publicada y usable. No se empieza una fase sin cerr
 
 ### Filosofía del producto (no romperla)
 
-1. **Una sola tarea Principal por día** y **máximo 2 Extras**. Si cumples la Principal, el día está ganado.
+1. **Una Principal por proyecto activo** (máximo 2 por día) y **máximo 2 Extras**. Las Principales **salen solas** los días de cada proyecto (los de su hábito; sin hábito, de lunes a viernes): la siguiente tarea pendiente en el orden en que la escribiste. La que no cumples sigue en Hoy, en rojo («Vencida desde …»), hasta que la hagas. El día está ganado cuando las haces todas.
 2. **Máximo 2 proyectos activos.** El resto va a Congelados. Los frentes de **hábito** (lo mismo cada día, como leer 20 minutos) no ocupan cupo.
 3. **Mínimo innegociable:** en un día malo, cumplir el mínimo mantiene la racha. Regla: *nunca fallar dos veces seguidas*.
-4. **Se decide la noche anterior y de día solo se ejecuta.**
+4. **De día solo se ejecuta.** La app decide la Principal; la noche anterior solo vacías la Bandeja y, si quieres, cambias algo.
 5. **Interfaz minimalista:** casillas, recuadros punteados con "+" para lo vacío y un botón **"!"** de ayuda en cada apartado (objeto `HELP`). Pocas palabras en pantalla.
 6. **Todo queda ligado al frente:** el asistente "Crear frente" pregunta primero el tipo y si empieza **Activo** o **Congelado**. Un proyecto lleva por Frente → Tareas → Objetivo → Hábito (objetivo y hábito opcionales). Un hábito lleva por Frente → Tiempo al día → Meta con fecha (opcional). Congelado no pide fechas ni hábito de proyecto y no crea bosque: las fechas se eligen al activarlo.
 7. **Los formularios se comparten:** el asistente y cada módulo usan exactamente el mismo formulario (`goalFields`/`readGoalFields` y `habitFields`/`readHabitFields`). Si agregas un campo, agrégalo ahí y aparecerá en los dos lugares.
@@ -62,11 +62,13 @@ Las colecciones viven en la raíz. Se escribe con `put(col, obj)` (reemplazo com
 
 ```
 fronts/{id}   { name, note, status: "active"|"frozen", order, created, kind?: "habit",  // sin kind = proyecto
+                planSkip?: "YYYY-MM-DD",                       // ese día quitaste su Principal: no vuelve a salir sola
                 pauses: [{from:"YYYY-MM-DD", to?:"YYYY-MM-DD"}] }   // periodos congelado; el bosque no cuenta fallos ahí
 tasks/{id}    { title, frontId|null, minutes|null, slot: null|"critical"|"secondary",
                 date: "YYYY-MM-DD"|null, done, doneAt, created, archived?,
                 missed?: ["YYYY-MM-DD"],                       // días en que fue la Principal y no se hizo (se guarda al moverla o quitarla)
-                someday?: "YYYY-MM-DD" }                       // idea congelada desde la Bandeja (sin frente ni plan); sale de inbox() y va a ideas()
+                someday?: "YYYY-MM-DD",
+                since?: "YYYY-MM-DD" }                         // Principal vencida: primer día en que fue Principal                       // idea congelada desde la Bandeja (sin frente ni plan); sale de inbox() y va a ideas()
 goals/{id}    { frontId, title, why, start, deadline, standard, minimum, trigger,   // start/deadline: null si se creó con el frente congelado (se ponen al activarlo)
                 weekly: [{text, done}],         // largo = goalWeeks(g), sale de las fechas
                 premortem: [{cause, counter}×3], rewardMid, rewardEnd, created }
@@ -276,6 +278,16 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 **Problema:** al crear «Jr Penetration Tester» el usuario pensó que el proyecto ya incluía el objetivo y lo saltó; luego veía «+ Objetivo» sin entender por qué.
 
 **Hecho:** el paso Objetivo de un proyecto explica «La meta con fecha de X: qué quieres lograr y para cuándo. De aquí salen sus semanas y su bosque.» y trae escrita la propuesta «Completar X» (`W.goalSeen`; si eliges «Sin objetivo» no vuelve). En Frentes, un proyecto sin objetivo dice «+ Objetivo · sin él no hay bosque».
+
+### Principales automáticas *(fase 2 · hecha, falta publicar)*
+
+**Problema:** con 2 proyectos activos solo cabía una Principal por día y había que elegirla a mano; la que no se cumplía salía como «Pendiente» y había que pasarla a hoy.
+
+**Hecho:**
+- `crits(d)`, `critOf(d, fid)`, `dayWon(d)`: una Principal por proyecto (máx. 2). `assign`, «Pasar a hoy», «Crear y programar» y «Planear mañana» reemplazan solo la del mismo frente.
+- `autoPlan()` (tras cada snapshot, con `planSoon()`, y al cambiar el día): para cada proyecto activo, si tiene una Principal vencida la pasa a hoy (`since` guarda desde cuándo; el día fallado va a `missed` solo si le tocaba, `dueOn`); si no, y hoy le toca, pone `nextTask(fid)`. `PLANNED` evita repetir la escritura; si la quitas («Quitar del día») se guarda `fronts.planSkip = hoy` y ese día no vuelve sola.
+- Hoy: «Principales 1/2», la vencida con borde y texto en rojo («Vencida desde el 15 oct»). Mañana muestra lo que saldrá solo. El día se gana con todas hechas (puntos, Plan B, Semana).
+- Cubierto por `tests/run.mjs` («Principales automáticas» y los casos de vencida).
 
 ### Tarea 4: IA dentro de la app *(media)*
 
