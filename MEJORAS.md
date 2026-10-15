@@ -279,7 +279,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 
 **Hecho:** el paso Objetivo de un proyecto explica «La meta con fecha de X: qué quieres lograr y para cuándo. De aquí salen sus semanas y su bosque.» y trae escrita la propuesta «Completar X» (`W.goalSeen`; si eliges «Sin objetivo» no vuelve). En Frentes, un proyecto sin objetivo dice «+ Objetivo · sin él no hay bosque».
 
-### Principales automáticas *(fase 2 · hecha, falta publicar)*
+### Principales automáticas *(fase 2 · hecha, publicada en la versión 18)*
 
 **Problema:** con 2 proyectos activos solo cabía una Principal por día y había que elegirla a mano; la que no se cumplía salía como «Pendiente» y había que pasarla a hoy.
 
