@@ -295,7 +295,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 
 **Cambio:** en Hoy, el aviso de menor prioridad dice «X no tiene tareas. Sin ellas no sale su Principal.» con el botón **Agregar**, que abre Frentes con el campo de nueva tarea de ese proyecto listo. Las ideas congeladas no cuentan como tareas. Al agregar una, sale sola como Principal si ese día toca.
 
-### Metas vivas y plegadas *(fase 2 · hecha, falta publicar)*
+### Metas vivas y plegadas *(fase 2 · hecha, publicada en la versión 20)*
 
 **Problema:** (1) Mañana repetía la Principal de hoy si no estaba hecha. (2) Terminar tareas en Hoy no movía nada en Metas: las semanas solo se marcaban a mano. (3) Un objetivo de muchas semanas llenaba la vista.
 
