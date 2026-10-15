@@ -332,6 +332,11 @@ ul.help li::marker{color:var(--faint)}
 .forest-count{font-size:12.5px;color:var(--muted);text-align:center;margin-top:-2px;text-wrap:balance}
 .forest .today{fill:none;stroke:var(--accent);stroke-width:.7}
 .forest .grow{transform-box:fill-box;transform-origin:50% 100%;animation:grow .8s cubic-bezier(.2,.8,.3,1.15) both}
+/* viento: al deslizar el dedo de lado sobre el bosque los árboles se inclinan y vuelven meciéndose */
+.forest svg{touch-action:pan-y}
+.forest .sway{transform-box:fill-box;transform-origin:50% 100%;transform:skewX(var(--lean,0deg))}
+.forest svg.calm .sway{animation:sway 1.4s cubic-bezier(.3,.6,.4,1) var(--d,0ms) both}
+@keyframes sway{0%{transform:skewX(var(--from,0deg))}30%{transform:skewX(calc(var(--from,0deg) * -.55))}55%{transform:skewX(calc(var(--from,0deg) * .3))}78%{transform:skewX(calc(var(--from,0deg) * -.12))}100%{transform:skewX(0deg)}}
 @keyframes grow{from{transform:scale(.15);opacity:0}}
 /* ---------- hábitos con tiempo ---------- */
 .hf{display:grid;gap:14px}
@@ -681,10 +686,11 @@ function forestSvg(g, days){
     if (x.d === t){ const lv = RANK[x.state] || 0, prev = forestSeen[g.id]; forestSeen[g.id] = lv; if (prev !== undefined && lv > prev) grow = ' class="grow"'; }
     if (x.d === t && x.state !== "rest") top = dia(p.x, p.y, "today"); // hoy congelado no se marca
     const shadow = /tree|fruit|saved|wilt/.test(x.state) ? `<ellipse class="sh" cx="1.6" cy=".6" rx="${x.state === "saved" ? 3.6 : 5}" ry="${x.state === "saved" ? 1.6 : 2.2}"/>` : "";
-    return (art ? `<g transform="translate(${cx} ${cy}) scale(.84)">${shadow}<g${grow}>${art}</g></g>` : "");
+    const tall = /tree|fruit|saved/.test(x.state), sz = tall ? "1.2 1.5" : ".95"; // árboles más altos y llenos en el mismo cuadro: se tocan y el bosque se ve tupido
+    return (art ? `<g transform="translate(${cx} ${cy}) scale(${sz})">${shadow}<g class="sway" style="--d:${(hashStr(x.d) % 9) * 40}ms"><g${grow}>${art}</g></g></g>` : "");
   }).join("");
   const px = Math.min(380, 120 + side * 26);
-  return `<svg viewBox="${L - 2} -18.5 ${side * W + 4} ${D + T + 21.5}" style="max-width:${px}px" aria-hidden="true">${ground}${objs}${top}</svg>`;
+  return `<svg viewBox="${L - 2} -32 ${side * W + 4} ${D + T + 35}" style="max-width:${px}px" aria-hidden="true">${ground}${objs}${top}</svg>`;
 }
 function forestStats(g, days){
   const c = k => days.filter(x => k.includes(x.state)).length;
@@ -1825,6 +1831,14 @@ Object.assign(A, {
   "focus-finish"(d){ if (d.done && F.kind !== "habit"){ const t = task(F.id); if (t && !t.done) toggleDone(F.id); } F.id = null; renderFocus(); }
 });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && modal.render && !modal.guard) closeModal(); });
+/* viento en el bosque: el dedo lo inclina mientras se mueve; al soltar, cada árbol vuelve meciéndose */
+const WIND = { svg:null, x:0, lean:0 };
+document.addEventListener("pointerdown", e => { const sv = e.target.closest && e.target.closest(".forest svg"); if (!sv) return; WIND.svg = sv; WIND.x = e.clientX; WIND.lean = 0; sv.classList.remove("calm"); });
+document.addEventListener("pointermove", e => { const sv = WIND.svg; if (!sv) return;
+  WIND.lean = Math.max(-14, Math.min(14, (e.clientX - WIND.x) * -.18)); sv.style.setProperty("--lean", WIND.lean + "deg"); });
+const windEnd = () => { const sv = WIND.svg; if (!sv) return; WIND.svg = null;
+  sv.style.setProperty("--from", WIND.lean + "deg"); sv.style.setProperty("--lean", "0deg"); void sv.getBoundingClientRect(); sv.classList.add("calm"); };
+document.addEventListener("pointerup", windEnd); document.addEventListener("pointercancel", windEnd);
 document.addEventListener("toggle", e => { const k = e.target.dataset && e.target.dataset.keep; if (k) e.target.open ? KEEP.add(k) : KEEP.delete(k); }, true);
 document.addEventListener("visibilitychange", () => { if (!document.hidden && F.running) tick(); });
 

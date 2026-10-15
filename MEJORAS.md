@@ -267,6 +267,8 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 
 **Problema:** «siento mucha presión visual». Había un «!» con círculo en cada sección, varios recuadros vacíos a la vez en Hoy, hasta 4 avisos juntos y 10 filas «Sin definir» en Metas.
 
+**Bosque más vivo:** los árboles miden 1,2 × 1,5 en el mismo cuadro (se tocan y el bosque se ve tupido). Al deslizar el dedo de lado sobre la isla se inclinan con el dedo y al soltar vuelven meciéndose, cada uno con un pequeño desfase (`WIND`, `.sway`, `@keyframes sway`; `touch-action:pan-y` deja subir y bajar la página).
+
 **Hecho:** los «!» quedan tenues y sin círculo; Hoy no pide la hora fija (se elige en Ajustes) y Extras aparece solo cuando ya hay Principal; Hoy muestra un solo aviso, el más importante (2 días sin cumplir → árbol marchito → revisión del domingo → pendientes, en una línea con «y N más» → la última vez no cumpliste); Metas muestra solo la semana actual y las que tienen texto, y pliega el resto en «Todas las semanas (N)». Cubierto por `tests/run.mjs` («Calma visual»).
 
 ### Tarea 4: IA dentro de la app *(media)*
