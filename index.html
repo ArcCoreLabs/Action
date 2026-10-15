@@ -422,6 +422,9 @@ ul.help{font-size:14px}
 .day-line{margin-top:-2px}
 .day-line .dash{min-height:36px;font-size:13px}
 .opt[disabled]{opacity:.45;cursor:not-allowed}
+/* ---------- calma: menos cosas que llaman la atención ---------- */
+.info{border-color:transparent;color:var(--faint);opacity:.75} /* la ayuda sigue ahí, pero ya no parece una alerta */
+.info:hover{color:var(--accent);border-color:transparent;opacity:1}
 /* ---------- iPhone: nada se sale por los lados y, con una hoja abierta, el fondo se queda quieto ---------- */
 input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;display:block;min-width:0;max-width:100%;text-align:left} /* con su aspecto nativo, el iPhone les pone relleno y ancho mínimo propios por encima de este CSS y se salen ~16 px */
 input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and-time-value{text-align:left;min-height:1.4em}
@@ -797,7 +800,7 @@ function dayLine(){ // "block" · "planb" · "pick" · "" (fin de semana)
   const now = new Date(), hm = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
   if (st.planBTime && hm >= st.planBTime && !(c && c.done)) return {k:"planb", html:'<p class="notice warn day-line"><span>Plan B activo: hoy solo el mínimo</span></p>'};
   if (st.fixedTime) return {k:"block", html:`<p class="notice day-line"><span>Tu bloque: ${esc(fmtHour(st.fixedTime))}</span></p>`};
-  return {k:"pick", html:`<div class="day-line">${dash("Elegir tu hora fija", "settings")}</div>`};
+  return {k:"pick", html:""}; // sin hora fija no se pide nada aquí: se elige en Ajustes
 }
 
 /* ================= VISTAS ================= */
@@ -807,19 +810,20 @@ VIEWS.hoy = function(){
   const d = today(), c = crit(d), s = secs(d), hs = habits();
   const cT = crit(addDays(d, 1));
 
-  const nt = [];
+  const nt = []; // de todos los avisos se muestra solo el primero: van en orden de importancia
   const names = list => list.map(h => esc(h.name)).join(" y ");
   const pend = hs.filter(h => scheduled(h, d) && !(h.log || {})[d]);
   const wilting = active().map(f => forestGoal(f.id)).filter(g => g && forestWilting(g) && (pend.some(h => h.frontId === g.frontId) || (c && !c.done && c.frontId === g.frontId)));
   const alarm = pend.filter(h => missedRun(h) >= 2), once = pend.filter(h => missedRun(h) === 1 && !wilting.some(g => g.frontId === h.frontId));
   if (alarm.length) nt.push(`<p class="notice warn"><span>Llevas 2 días sin cumplir <b>${names(alarm)}</b>. Hoy haz al menos el mínimo.</span></p>`);
-  else if (once.length) nt.push(`<p class="notice acc"><span>La última vez no cumpliste <b>${names(once)}</b>. Hoy no falles: haz al menos el mínimo.</span></p>`);
   if (!alarm.length && wilting.length){
     const one = wilting.length === 1, canMin = pend.some(h => h.frontId === wilting[0].frontId);
     nt.push(`<p class="notice acc"><span>${one ? "Tu árbol" : "Tus árboles"} de <b>${wilting.map(g => esc(front(g.frontId).name)).join(" y ")}</b> se ${one ? "está" : "están"} marchitando. ${one ? (canMin ? "Hoy haz al menos el mínimo y lo salvas." : "Hoy termina la Principal y lo salvas.") : "Hoy avanza en cada uno y los salvas."}</span></p>`);
   }
-  S.tasks.filter(t => t.slot && t.date && t.date < d && !t.done).forEach(t => nt.push(`<p class="notice"><span>Pendiente: <b>${esc(t.title)}</b></span><button class="text-btn" data-act="carry" data-id="${t.id}">Pasar a hoy</button><button class="text-btn muted" data-act="unassign" data-id="${t.id}">Quitar</button></p>`));
-  if (dow(d) === 0 && !(S.reviews.find(r => r.id === monday(d)) || {}).closed) nt.unshift(`<p class="notice acc"><span>Hoy toca la revisión semanal.</span><button class="text-btn" data-act="nav" data-v="semana">Abrir</button></p>`);
+  if (dow(d) === 0 && !(S.reviews.find(r => r.id === monday(d)) || {}).closed) nt.push(`<p class="notice acc"><span>Hoy toca la revisión semanal.</span><button class="text-btn" data-act="nav" data-v="semana">Abrir</button></p>`);
+  const old = S.tasks.filter(t => t.slot && t.date && t.date < d && !t.done).sort((a,b) => a.date.localeCompare(b.date));
+  if (old.length) nt.push(`<p class="notice"><span>Pendiente: <b>${esc(old[0].title)}</b>${old.length > 1 ? ` (y ${old.length - 1} más)` : ""}</span><button class="text-btn" data-act="carry" data-id="${old[0].id}">Pasar a hoy</button><button class="text-btn muted" data-act="unassign" data-id="${old[0].id}">Quitar</button></p>`);
+  if (!alarm.length && once.length) nt.push(`<p class="notice acc"><span>La última vez no cumpliste <b>${names(once)}</b>. Hoy no falles: haz al menos el mínimo.</span></p>`);
 
   let main;
   if (c){
@@ -853,9 +857,9 @@ VIEWS.hoy = function(){
   return `
   <div class="sec-head page"><h1 class="date-title">${cap(fmt(d, {weekday:"long", day:"numeric", month:"long"}))}</h1></div>
   ${dayLine().html}
-  ${nt.length ? `<div class="notices">${nt.slice(0, 4 + (!alarm.length && wilting.length && once.length ? 1 : 0)).join("")}</div>` : ""}
+  ${nt.length ? `<div class="notices">${nt[0]}</div>` : ""}
   <section class="block">${head("Principal", "principal")}${main}</section>
-  <section class="block">${head("Extras", "extras", `<span class="count">${s.length}/2</span>`)}<div class="list">${extras}</div></section>
+  ${c || s.length ? `<section class="block">${head("Extras", "extras", `<span class="count">${s.length}/2</span>`)}<div class="list">${extras}</div></section>` : ""}
   <section class="block">${head("Hábitos", "habitos", hs.length ? '<button class="text-btn muted" data-act="habits-edit">Editar</button>' : "")}
     ${hs.length ? (hrows ? `<div class="list">${hrows}</div>` : '<p class="empty">Hoy no toca ningún hábito.</p>') : dash("Crear hábito", "habit-new")}</section>
   <section class="block">${head("Semana", "dots")}<div class="dots">${dots}</div></section>
@@ -936,9 +940,12 @@ VIEWS.metas = function(){
       <div>${dated ? `<div class="bar"><span style="width:${fst ? hit / Math.max(1, plan) * 100 : doneN/N*100}%"></span><i style="left:${elapsed}%"></i></div>` : ""}
         <p class="bar-legend">${!dated ? "Sin fechas · ponlas en ⋯ → Editar" : join([g.start && today() < g.start ? `Empieza el ${fmtShort(g.start)}` : g.deadline && today() > g.deadline ? (hk ? "Terminó" : doneN === N ? "Cumplido" : "Plazo vencido") : fst ? `Día ${diffDays(g.start, today()) + 1} de ${fst.total}` : `Semana ${wk} de ${N}`, fst ? plural(hit, "día cumplido", "días cumplidos") : `${doneN}/${N} semanas cumplidas`, g.deadline && today() <= g.deadline ? `faltan ${diffDays(today(), g.deadline)} días` : ""])}</p></div>
       ${forestOn(g) ? forestBlock(g) : ""}
-      ${items.length && !hk ? `<div class="list">${items.map(w => `<div class="trow ${w.done ? "done" : ""} ${w.i + 1 === wkNow ? "cur" : ""}">
+      ${items.length && !hk ? (() => { const shown = w => w.text || w.done || w.i + 1 === (wkNow || (wk === 0 ? 1 : 0)); // las semanas vacías no se muestran: se pliegan
+        const row = w => `<div class="trow ${w.done ? "done" : ""} ${w.i + 1 === wkNow ? "cur" : ""}">
         <button class="check ${w.done ? "on" : ""}" data-act="goal-week" data-id="${g.id}" data-i="${w.i}" aria-label="Marcar semana ${w.i + 1}">${ICON.check}</button>
-        <div class="tmain"><span class="ttitle">${w.text ? esc(w.text) : '<span class="muted">Sin definir</span>'}</span><span class="tmeta">Semana ${w.i + 1}${w.i + 1 === wkNow ? " · esta semana" : ""}</span></div></div>`).join("")}</div>` : ""}
+        <div class="tmain"><span class="ttitle">${w.text ? esc(w.text) : '<span class="muted">Sin definir</span>'}</span><span class="tmeta">Semana ${w.i + 1}${w.i + 1 === wkNow ? " · esta semana" : ""}</span></div></div>`;
+        const vis = items.filter(shown);
+        return `${vis.length ? `<div class="list">${vis.map(row).join("")}</div>` : ""}${vis.length < items.length ? `<details><summary>Todas las semanas (${items.length})</summary><div class="d-body"><div class="list">${items.map(row).join("")}</div></div></details>` : ""}`; })() : ""}
       ${(gMin || g.trigger || gStd || g.why || pm.length) ? `<details><summary>Plan</summary><div class="d-body kvs">
         ${gMin ? `<dl class="kv"><dt>Mínimo innegociable</dt><dd>${esc(gMin)}</dd></dl>` : ""}
         ${gStd ? `<dl class="kv"><dt>Estándar</dt><dd>${esc(gStd)}</dd></dl>` : ""}

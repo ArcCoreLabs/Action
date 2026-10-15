@@ -340,7 +340,7 @@ console.log('\nUn solo mínimo y estándar');
   ok(await p.locator('#g-standard').count() === 0 && /los del hábito CCFA \(15 min · 45 min\)/.test(await p.locator('#g-stdmin').textContent()), 'la meta muestra los del hábito en solo lectura');
   await p.click('[data-form=goal] button[type=submit]'); await p.waitForTimeout(80);
   await p.locator('.goal details summary').first().click();
-  ok(/Mínimo innegociable15 min/.test(await p.locator('.goal details').first().textContent()), 'Metas → Plan muestra el mínimo del hábito');
+  ok(/Mínimo innegociable15 min/.test(await p.locator('.goal details:last-of-type').first().textContent()), 'Metas → Plan muestra el mínimo del hábito');
   ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
   // "No por ahora": solo mínimo y estándar, guardados en la meta
   p = await open('light', { 'meta/settings':{}, 'meta/focus':{ days:{} } });
@@ -361,7 +361,7 @@ console.log('\nUn solo mínimo y estándar');
   const old = { 'fronts/p1':{ name:'CCFA', status:'active', order:1, created:1 }, 'habits/h1':{ name:'CCFA', minimum:'20 min', standard:'1 h', days:[1,2,3,4,5], frontId:'p1', log:{}, order:1, created:'2026-09-01' },
     'goals/g1':{ frontId:'p1', title:'Aprobar', start:'2026-10-01', deadline:'2026-10-28', minimum:'5 min viejo', standard:'30 min viejo', weekly:[], premortem:[], created:1 }, 'meta/settings':{}, 'meta/focus':{ days:{} } };
   p = await open('light', old); await nav(p, 'metas'); await p.locator('.goal details summary').first().click();
-  ok(/20 min/.test(await p.locator('.goal details').first().textContent()) && !/5 min viejo/.test(await p.locator('.goal details').first().textContent()), 'con datos viejos se ve el mínimo del hábito');
+  ok(/20 min/.test(await p.locator('.goal details:last-of-type').first().textContent()) && !/5 min viejo/.test(await p.locator('.goal details:last-of-type').first().textContent()), 'con datos viejos se ve el mínimo del hábito');
   await p.click('[data-act=goal-sheet]'); await p.click('[data-act=goal-edit]'); await p.click('[data-form=goal] button[type=submit]'); await p.waitForTimeout(80);
   s = await store(p); ok(s.goals[0].minimum === '5 min viejo', 'guardar la meta no borra su mínimo viejo');
   // nuevo objetivo: al cambiar de frente cambian los campos
@@ -381,7 +381,7 @@ console.log('\nUn solo mínimo y estándar');
   // hábito viejo sin mínimo: se ve el de la meta, y al editar el hábito viene precargado
   const empty = { ...old, 'habits/h1':{ ...old['habits/h1'], minimum:'', standard:'' } };
   p = await open('light', empty); await nav(p, 'metas'); await p.locator('.goal details summary').first().click();
-  ok(/5 min viejo/.test(await p.locator('.goal details').first().textContent()), 'si el hábito no tiene mínimo, se ve el de la meta');
+  ok(/5 min viejo/.test(await p.locator('.goal details:last-of-type').first().textContent()), 'si el hábito no tiene mínimo, se ve el de la meta');
   await nav(p, 'frentes'); await p.click('[data-act=front-sheet][data-id=p1]'); await p.click('[data-act=habit-edit]');
   ok(await p.locator('#h-m-h1').inputValue() === '5 min viejo', 'editar el hábito trae el mínimo de la meta'); await p.close();
   // "+ Hábito" en un proyecto trae el mínimo de la meta
@@ -421,10 +421,9 @@ console.log('\nTu bloque y el Plan B');
   let p = await b.newPage({ viewport:{ width:390, height:860 } }); await p.clock.setFixedTime(new Date('2026-10-10T18:00:00'));
   await p.addInitScript(s => { window.__SEED = s; }, st); await p.goto('file://' + page); await p.waitForSelector('.sec-head');
   ok(await p.locator('.day-line').count() === 0, 'el fin de semana no aparece la línea'); await p.close();
-  // sin hora fija: recuadro para elegirla, que abre Ajustes
+  // sin hora fija: no se pide nada en Hoy (se elige en Ajustes)
   p = await open('light', { 'meta/settings':{}, 'meta/focus':{ days:{} } });
-  ok(/Elegir tu hora fija/.test(await p.locator('.day-line').textContent()), 'sin hora fija aparece "+ Elegir tu hora fija"');
-  await p.click('.day-line .dash'); ok(await p.locator('#s-time').count() === 1, 'el recuadro abre Ajustes'); await p.close();
+  ok(await p.locator('.day-line').count() === 0 && !/Elegir tu hora fija/.test(await p.locator('#view').textContent()), 'sin hora fija Hoy no muestra otro recuadro'); await p.close();
   // Plan B sin hora fija, pasada la hora: igual avisa
   p = await open('light', { 'meta/settings':{ planBTime:'19:00' }, 'meta/focus':{ days:{} } });
   ok(/Plan B activo/.test(await p.locator('.day-line').textContent()), 'el Plan B avisa aunque no haya hora fija'); await p.close();
@@ -712,6 +711,22 @@ for (const scheme of ['light', 'dark']){
   ok(!(await p.locator('#g-weeks').isVisible()), 'en un congelado el objetivo no muestra semanas');
   await p.selectOption('#g-front', 'p1'); ok(await p.locator('#g-weeks').isVisible() && await p.locator('#g-start').isVisible(), 'al elegir un frente activo aparecen fechas y semanas');
   ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
+}
+// ---------- 6e. calma visual ----------
+console.log('\nCalma visual');
+{ const seed = { ...seedGoal({ start:add(TODAY, -6), days:70, levels:seq(add(TODAY, -6), [2,2,2,2]) }),
+    'tasks/old':{ title:'Repasar notas', frontId:'f1', minutes:20, slot:'critical', date:add(TODAY, -1), done:false, created:1 },
+    'tasks/old2':{ title:'Leer guía', frontId:'f1', minutes:20, slot:'secondary', date:add(TODAY, -2), done:false, created:2 } };
+  seed['goals/g1'].weekly = seed['goals/g1'].weekly.map((w, i) => ({ text:i ? '' : 'Primer módulo', done:false }));
+  const p = await open('light', seed);
+  ok(await p.locator('.notices .notice').count() === 1 && /Llevas 2 días sin cumplir/.test(await p.locator('.notices').textContent()), 'Hoy muestra un solo aviso: el más importante');
+  ok(!/Extras/.test(await p.locator('#view').textContent()), 'sin Principal no aparece Extras');
+  ok(await p.evaluate(() => getComputedStyle(document.querySelector('.info')).borderTopColor) === 'rgba(0, 0, 0, 0)', 'los «!» no tienen círculo');
+  await p.click('[data-act=hcheck]'); await p.waitForTimeout(80);
+  const nt2 = await p.locator('.notices').textContent(); ok(/Pendiente: Leer guía \(y 1 más\)/.test(nt2) && await p.locator('.notices .notice').count() === 1, `resuelto el aviso, queda una sola línea de pendientes ("${nt2}")`);
+  await nav(p, 'metas'); const g = p.locator('.goal');
+  ok(await g.locator('> .list .trow').count() === 1 && /Todas las semanas \(10\)/.test(await g.textContent()), 'Metas muestra solo la semana actual y pliega las demás');
+  ok(!p.errs.length && await noScroll(p) === 390, 'sin errores ni scroll ' + p.errs.join('|')); await p.close();
 }
 // ---------- 7. hojas en iPhone ----------
 console.log('\nHojas en iPhone');

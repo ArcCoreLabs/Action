@@ -263,6 +263,12 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 - Revisión: `liveGoals(f)` deja fuera los objetivos cumplidos (`goalDone`) y pone primero los que tienen fechas (también `goalFor`); al activar, **todos** los objetivos vivos del frente reciben fechas. Solo el tramo congelado que se cierra corre la fecha límite (los anteriores ya la corrieron). En la hoja de activar, mover el inicio conserva la duración («Duración: 4 semanas»). Si ya tenía avance: «Sigue donde ibas…» y «Su bosque sigue donde iba.». Si pasas a Congelado después de llenar el hábito, ese hábito no se crea. En el formulario, pasar a un frente activo abre el plan por semanas. El primer paso del asistente separa «Tipo» y «¿Empieza ya?».
 - Cubierto por `tests/run.mjs` («Frentes congelados sin fechas» y sus arreglos).
 
+### Calma visual *(fase 2 · hecha, falta publicar)*
+
+**Problema:** «siento mucha presión visual». Había un «!» con círculo en cada sección, varios recuadros vacíos a la vez en Hoy, hasta 4 avisos juntos y 10 filas «Sin definir» en Metas.
+
+**Hecho:** los «!» quedan tenues y sin círculo; Hoy no pide la hora fija (se elige en Ajustes) y Extras aparece solo cuando ya hay Principal; Hoy muestra un solo aviso, el más importante (2 días sin cumplir → árbol marchito → revisión del domingo → pendientes, en una línea con «y N más» → la última vez no cumpliste); Metas muestra solo la semana actual y las que tienen texto, y pliega el resto en «Todas las semanas (N)». Cubierto por `tests/run.mjs` («Calma visual»).
+
 ### Tarea 4: IA dentro de la app *(media)*
 
 Usar la capability `sample` (declararla: `sample:{}`). Se llama solo cuando el usuario toca un botón; nunca al cargar.
