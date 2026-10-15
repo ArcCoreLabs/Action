@@ -20,7 +20,8 @@ async function open(scheme, seed, width = 390){
   return p;
 }
 const store = p => p.evaluate(() => { const s = window.__store, v = k => Object.entries(s).filter(([x]) => x.startsWith(k + '/')).map(([x, d]) => ({ id:x.split('/')[1], ...d })); return { fronts:v('fronts'), tasks:v('tasks'), goals:v('goals'), habits:v('habits') }; });
-const nav = (p, v) => p.click(`#nav [data-v=${v}]`);
+const nav = async (p, v) => { await p.click(`#nav [data-v=${v}]`); if (v === 'frentes') await unfold(p); };
+const unfold = p => p.evaluate(() => new Promise(r => { document.querySelectorAll('details.front:not([open])').forEach(d => { d.open = true; }); setTimeout(r, 30); })); // abre los frentes plegados (los hábitos empiezan plegados), como si los tocaras
 const toastText = p => p.locator('.toast').textContent().catch(() => '');
 const noScroll = p => p.evaluate(() => document.documentElement.scrollWidth);
 
@@ -820,6 +821,34 @@ console.log('\nMetas vivas');
       await nav(p, 'hoy'); await nav(p, 'metas');
       ok(await g.locator('details[data-keep^=plan]').evaluate(e => e.open) && await g.locator('details[data-keep^=weeks]').evaluate(e => e.open), 'lo que abriste sigue abierto al volver a Metas');
       await nav(p, 'semana'); ok(/Se marcó sola: 1 tarea hecha/.test(await p.locator('#view').textContent()), 'Semana también la muestra marcada sola');
+    }
+    ok(!p.errs.length && await noScroll(p) === 390, `${scheme}: sin errores ni scroll ` + p.errs.join('|')); await p.close();
+  }
+}
+// ---------- 6h. Frentes plegables ----------
+console.log('\nFrentes plegables');
+{ const seed = { 'fronts/a':{ name:'CCFA', status:'active', order:2, created:1 }, 'fronts/h':{ name:'Leer', kind:'habit', status:'active', order:1, created:1 },
+    'habits/hh':{ name:'Leer', days:[1,2,3,4,5], frontId:'h', log:{}, order:1, created:TODAY },
+    'meta/settings':{}, 'meta/focus':{ days:{} } };
+  for (let i = 1; i <= 6; i++) seed['tasks/t' + i] = { title:'Tarea ' + i, frontId:'a', minutes:45, slot:null, date:null, done:false, created:i };
+  for (let i = 1; i <= 2; i++) seed['tasks/d' + i] = { title:'Hecha ' + i, frontId:'a', minutes:45, slot:null, date:null, done:true, doneAt:add(TODAY, -i), created:10 + i };
+  for (const scheme of ['light', 'dark']){
+    const p = await open(scheme, seed); await p.waitForTimeout(500); await p.click('#nav [data-v=frentes]');
+    const fa = p.locator('details.front:has(h2:text-is("CCFA"))'), fh = p.locator('details.front:has(h2:text-is("Leer"))');
+    ok(await fa.evaluate(e => e.open) && !(await fh.evaluate(e => e.open)), `${scheme}: el proyecto empieza abierto y el hábito plegado`);
+    ok(/6 pendientes\s*·\s*2 hechas/.test(await fa.locator('summary.front-head').textContent()) && /Hábito · lunes a viernes/.test(await fh.locator('summary').textContent()), `${scheme}: el título resume cada frente (${(await fa.locator('summary.front-head .tmeta').textContent())})`);
+    const vis = await fa.locator('.front-body > .list > .trow').count();
+    ok(vis === 3 && /3 tareas más/.test(await fa.textContent()) && !(await fa.locator('.more-tasks').evaluate(e => e.open)) && !(await fa.locator('details[data-keep^=done]').evaluate(e => e.open)), `${scheme}: a la vista 3 tareas; el resto y las hechas plegadas (${vis})`);
+    await p.screenshot({ path:path.join(out, `frentes-plegables-${scheme}.png`) });
+    if (scheme === 'light'){
+      await fh.locator('summary [data-act=front-sheet]').click(); await p.waitForTimeout(100);
+      ok(await p.locator('#modal .sheet').count() === 1 && !(await fh.evaluate(e => e.open)), 'los ⋯ del título abren las opciones sin desplegar el frente');
+      await p.click('[data-act=close]'); await fa.locator('summary.front-head h2').click(); await p.waitForTimeout(80);
+      await nav(p, 'hoy'); await p.click('#nav [data-v=frentes]');
+      ok(!(await fa.evaluate(e => e.open)), 'si cierras un proyecto sigue cerrado al volver a Frentes');
+      await fa.locator('.more-tasks').evaluate(e => { e.closest('details.front').open = true; e.open = true; }); await p.waitForTimeout(50);
+      await fa.locator('.more-tasks [data-act=done] >> nth=0').click(); await p.waitForTimeout(300);
+      ok(await fa.evaluate(e => e.open) && await fa.locator('.more-tasks').evaluate(e => e.open), 'marcar una tarea de la lista plegada no la vuelve a cerrar');
     }
     ok(!p.errs.length && await noScroll(p) === 390, `${scheme}: sin errores ni scroll ` + p.errs.join('|')); await p.close();
   }

@@ -429,6 +429,14 @@ ul.help{font-size:14px}
 .opt[disabled]{opacity:.45;cursor:not-allowed}
 .main-task.late{box-shadow:inset 3px 0 0 var(--warn)} /* Principal vencida: sigue en Hoy hasta que la hagas */
 .late-txt{color:var(--warn);font-weight:600}
+details.front{border-top:0;padding-top:0}
+details.front>summary.front-head{color:var(--ink);font-size:inherit;font-weight:inherit;gap:8px;margin-bottom:6px}
+details.front>summary.front-head .tmain{gap:0}
+details.front>summary.front-head::after{order:-1;margin:0;width:14px;flex:none;text-align:center} /* el +/– va a la izquierda; los ⋯ quedan a la derecha */
+details.front:not([open])>summary.front-head{margin-bottom:0}
+details.front:not([open]){padding-bottom:12px;border-bottom:1px solid var(--line)}
+.more-tasks{border-top:1px solid var(--line);padding:8px 0}
+.more-tasks>summary{font-size:12.5px}
 .trow .tmeta.wk-tasks{display:grid;gap:1px;color:var(--ok)} /* lo que hiciste esa semana desde Hoy */
 /* ---------- calma: menos cosas que llaman la atención ---------- */
 .info{border-color:transparent;color:var(--faint);opacity:.75} /* la ayuda sigue ahí, pero ya no parece una alerta */
@@ -922,8 +930,11 @@ VIEWS.frentes = function(){
     const hk = isHabitFront(f), ts = S.tasks.filter(t => t.frontId === f.id);
     const open = ts.filter(t => !t.done).sort((a,b) => (a.slot ? 0 : 1) - (b.slot ? 0 : 1) || (a.created||0) - (b.created||0));
     const done = ts.filter(t => t.done).sort((a,b) => String(b.doneAt||"").localeCompare(String(a.doneAt||"")));
-    return `<section class="front">
-      <div class="front-head"><h2>${esc(f.name)}</h2><button class="more" data-act="front-sheet" data-id="${f.id}" aria-label="Opciones del frente">${ICON.more}</button></div>
+    const hb = S.habits.find(x => x.frontId === f.id), sum = hk ? (hb ? `Hábito · ${esc(daysLabel(hb.days))}` : "Hábito") : join([open.length ? plural(open.length, "pendiente", "pendientes") : "Sin tareas", done.length ? plural(done.length, "hecha", "hechas") : ""]);
+    const top = open.slice(0, 3), rest = open.slice(3); // a la vista las 3 que siguen; el resto, plegado
+    return `<details class="front" data-fold="${f.id}" ${(FOLD[f.id] ?? !hk) ? "open" : ""}>
+      <summary class="front-head"><div class="tmain"><h2>${esc(f.name)}</h2><span class="tmeta">${sum}</span></div><button class="more" data-act="front-sheet" data-id="${f.id}" aria-label="Opciones del frente">${ICON.more}</button></summary>
+      <div class="front-body">
       ${(() => { const g = goalFor(f.id), h = S.habits.find(x => x.frontId === f.id);
         const gHtml = g ? (() => { const wk = goalWeek(g), n = goalWeeks(g), cur = (g.weekly || [])[Math.max(0, wk-1)];
           const tr = wk && forestOn(g) ? forestStats(g, forestDays(g)).trees : 0;
@@ -932,12 +943,13 @@ VIEWS.frentes = function(){
         const hHtml = h ? `<span class="tmeta fg-habit">Hábito · ${esc(daysLabel(h.days))}${h.minutes ? ` · ${h.minutes} min · mínimo ${h.minMinutes || h.minutes} min` : `${h.minimum ? ` · mínimo ${esc(h.minimum)}` : ""}${h.standard ? ` · estándar ${esc(h.standard)}` : ""}`}</span>` : "";
         const add = [!g ? `<button class="text-btn muted" data-act="goal-new" data-front="${f.id}">+ Objetivo${hk ? "" : " · sin él no hay bosque"}</button>` : "", !h ? `<button class="text-btn muted" data-act="habit-quick" data-front="${f.id}">+ Hábito</button>` : ""].join("");
         return (g || h ? `<div class="front-goal">${gHtml}${hHtml}</div>` : "") + (add ? `<div class="front-add">${add}</div>` : ""); })()}
-      ${hk ? (open.length ? `<div class="list">${open.map(t => taskRow(t)).join("")}</div>` : "") : `<div class="list">${open.map(t => taskRow(t)).join("")}
+      ${hk ? (open.length ? `<div class="list">${open.map(t => taskRow(t)).join("")}</div>` : "") : `<div class="list">${top.map(t => taskRow(t)).join("")}
+        ${rest.length ? `<details class="more-tasks" data-keep="more-${f.id}" ${KEEP.has("more-" + f.id) ? "open" : ""}><summary>${plural(rest.length, "tarea más", "tareas más")}</summary><div class="d-body"><div class="list">${rest.map(t => taskRow(t)).join("")}</div></div></details>` : ""}
         <form class="add-line" data-form="add-task" data-front="${f.id}"><span class="plus">+</span>
           <input type="text" id="add-${f.id}" placeholder="Nueva tarea" autocomplete="off" aria-label="Nueva tarea">
           <select id="min-${f.id}" aria-label="Minutos"><option value="15">15 min</option><option value="25">25 min</option><option value="45" selected>45 min</option><option value="60">60 min</option><option value="90">90 min</option></select><button class="text-btn" type="submit">Añadir</button></form></div>`}
-      ${done.length ? `<details style="margin-top:6px"><summary>Hechas (${done.length})</summary><div class="d-body"><div class="list">${done.slice(0,30).map(t => taskRow(t)).join("")}</div></div></details>` : ""}
-    </section>`;
+      ${done.length ? `<details data-keep="done-${f.id}" ${KEEP.has("done-" + f.id) ? "open" : ""} style="margin-top:6px"><summary>Hechas (${done.length})</summary><div class="d-body"><div class="list">${done.slice(0,30).map(t => taskRow(t)).join("")}</div></div></details>` : ""}
+      </div></details>`;
   };
   return `
   <div class="page-head">${head("Frentes", "frentes", `<span class="count">${proj.length}/2</span>`, "h1")}</div>
@@ -1071,6 +1083,7 @@ function helpSheet(k){
 
 /* ================= modales ================= */
 const modal = { render:null, live:false };
+const FOLD = {}; // frentes que abriste o cerraste (<details data-fold>); sin tocar, los proyectos abiertos y los hábitos plegados
 const KEEP = new Set(); // <details data-keep> que dejaste abiertos: siguen abiertos al redibujar
 const autoGrow = el => { const y = window.scrollY; el.style.height = "auto"; el.style.height = Math.max(44, el.scrollHeight) + "px"; if (window.scrollY !== y) window.scrollTo(0, y); };
 const growAll = () => requestAnimationFrame(() => document.querySelectorAll("textarea.auto").forEach(autoGrow));
@@ -1671,7 +1684,7 @@ function toast(msg){
 /* ================= acciones ================= */
 function confirmTap(key){ if (confirmKey === key){ confirmKey = null; return true; } confirmKey = key; sched(); setTimeout(() => { if (confirmKey === key){ confirmKey = null; sched(); } }, 4000); return false; }
 const A = {
-  "front-tasks"(d){ view = "frentes"; try { localStorage.setItem("ej-view", view); } catch(e){} closeModal(); render(); const i = document.getElementById("add-" + d.id); if (i){ i.scrollIntoView({block:"center"}); i.focus(); } },
+  "front-tasks"(d){ FOLD[d.id] = true; view = "frentes"; try { localStorage.setItem("ej-view", view); } catch(e){} closeModal(); render(); const i = document.getElementById("add-" + d.id); if (i){ i.scrollIntoView({block:"center"}); i.focus(); } },
   nav(d){ view = d.v; try { localStorage.setItem("ej-view", view); } catch(e){} closeModal(); render(); window.scrollTo(0,0); },
   close(){ closeModal(); },
   scrim(d, el, e){ if (e.target === el && !modal.guard) closeModal(); },
@@ -1776,7 +1789,7 @@ const A = {
 document.addEventListener("click", e => {
   const el = e.target.closest("[data-act]"); if (!el || el.disabled) return;
   const fn = A[el.dataset.act]; if (!fn) return;
-  if (el.tagName === "A") e.preventDefault();
+  if (el.tagName === "A" || el.closest("summary")) e.preventDefault(); // un botón dentro del título de un plegable no lo abre ni lo cierra
   fn(el.dataset, el, e);
 });
 
@@ -1873,7 +1886,7 @@ document.addEventListener("pointermove", e => { const sv = WIND.svg; if (!sv) re
 const windEnd = () => { const sv = WIND.svg; if (!sv) return; WIND.svg = null;
   sv.style.setProperty("--from", WIND.lean + "deg"); sv.style.setProperty("--lean", "0deg"); void sv.getBoundingClientRect(); sv.classList.add("calm"); };
 document.addEventListener("pointerup", windEnd); document.addEventListener("pointercancel", windEnd);
-document.addEventListener("toggle", e => { const k = e.target.dataset && e.target.dataset.keep; if (k) e.target.open ? KEEP.add(k) : KEEP.delete(k); }, true);
+document.addEventListener("toggle", e => { const ds = e.target.dataset || {}, k = ds.keep; if (k) e.target.open ? KEEP.add(k) : KEEP.delete(k); if (ds.fold) FOLD[ds.fold] = e.target.open; }, true);
 document.addEventListener("visibilitychange", () => { if (!document.hidden && F.running) tick(); });
 
 /* ================= arranque ================= */
