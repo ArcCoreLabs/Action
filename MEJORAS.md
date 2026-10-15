@@ -271,7 +271,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 
 **Hecho:** los «!» quedan tenues y sin círculo; Hoy no pide la hora fija (se elige en Ajustes) y Extras aparece solo cuando ya hay Principal; Hoy muestra un solo aviso, el más importante (2 días sin cumplir → árbol marchito → revisión del domingo → pendientes, en una línea con «y N más» → la última vez no cumpliste); Metas muestra solo la semana actual y las que tienen texto, y pliega el resto en «Todas las semanas (N)». Cubierto por `tests/run.mjs` («Calma visual»).
 
-### Objetivo claro en el asistente *(fase 2 · hecha, falta publicar)*
+### Objetivo claro en el asistente *(fase 2 · hecha, publicada en la versión 17)*
 
 **Problema:** al crear «Jr Penetration Tester» el usuario pensó que el proyecto ya incluía el objetivo y lo saltó; luego veía «+ Objetivo» sin entender por qué.
 
