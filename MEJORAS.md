@@ -289,7 +289,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 - Hoy: «Principales 1/2», la vencida con borde y texto en rojo («Vencida desde el 15 oct»). Mañana muestra lo que saldrá solo. El día se gana con todas hechas (puntos, Plan B, Semana).
 - Cubierto por `tests/run.mjs` («Principales automáticas» y los casos de vencida).
 
-### Aviso de proyecto sin tareas *(fase 2 · hecha, falta publicar)*
+### Aviso de proyecto sin tareas *(fase 2 · hecha, publicada en la versión 19)*
 
 **Problema:** un proyecto activo sin tareas pendientes no saca Principal y nada lo dice; podían pasar días sin avanzar ese frente sin notarlo.
 
