@@ -271,6 +271,12 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 
 **Hecho:** los «!» quedan tenues y sin círculo; Hoy no pide la hora fija (se elige en Ajustes) y Extras aparece solo cuando ya hay Principal; Hoy muestra un solo aviso, el más importante (2 días sin cumplir → árbol marchito → revisión del domingo → pendientes, en una línea con «y N más» → la última vez no cumpliste); Metas muestra solo la semana actual y las que tienen texto, y pliega el resto en «Todas las semanas (N)». Cubierto por `tests/run.mjs` («Calma visual»).
 
+### Objetivo claro en el asistente *(fase 2 · hecha, falta publicar)*
+
+**Problema:** al crear «Jr Penetration Tester» el usuario pensó que el proyecto ya incluía el objetivo y lo saltó; luego veía «+ Objetivo» sin entender por qué.
+
+**Hecho:** el paso Objetivo de un proyecto explica «La meta con fecha de X: qué quieres lograr y para cuándo. De aquí salen sus semanas y su bosque.» y trae escrita la propuesta «Completar X» (`W.goalSeen`; si eliges «Sin objetivo» no vuelve). En Frentes, un proyecto sin objetivo dice «+ Objetivo · sin él no hay bosque».
+
 ### Tarea 4: IA dentro de la app *(media)*
 
 Usar la capability `sample` (declararla: `sample:{}`). Se llama solo cuando el usuario toca un botón; nunca al cargar.

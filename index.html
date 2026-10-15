@@ -899,7 +899,7 @@ VIEWS.frentes = function(){
           if (!g.start || !g.deadline) return `<span class="tmeta">Objetivo · sin fechas</span><b>${esc(g.title)}</b>`;
           return `<span class="tmeta">${wk ? `Objetivo · ${hk && g.start && g.deadline ? `día ${Math.min(diffDays(g.start, today()) + 1, diffDays(g.start, g.deadline) + 1)} de ${diffDays(g.start, g.deadline) + 1}` : `semana ${wk} de ${n}`}${tr ? ` · ${plural(tr, "árbol", "árboles")}` : ""}` : `Objetivo · empieza el ${fmtShort(g.start)}`}</span><b>${esc(g.title)}</b>${!hk && cur && cur.text ? `<span class="fg-week">${wk ? "Esta semana" : "Primera semana"}: ${esc(cur.text)}</span>` : ""}`; })() : "";
         const hHtml = h ? `<span class="tmeta fg-habit">Hábito · ${esc(daysLabel(h.days))}${h.minutes ? ` · ${h.minutes} min · mínimo ${h.minMinutes || h.minutes} min` : `${h.minimum ? ` · mínimo ${esc(h.minimum)}` : ""}${h.standard ? ` · estándar ${esc(h.standard)}` : ""}`}</span>` : "";
-        const add = [!g ? `<button class="text-btn muted" data-act="goal-new" data-front="${f.id}">+ Objetivo</button>` : "", !h ? `<button class="text-btn muted" data-act="habit-quick" data-front="${f.id}">+ Hábito</button>` : ""].join("");
+        const add = [!g ? `<button class="text-btn muted" data-act="goal-new" data-front="${f.id}">+ Objetivo${hk ? "" : " · sin él no hay bosque"}</button>` : "", !h ? `<button class="text-btn muted" data-act="habit-quick" data-front="${f.id}">+ Hábito</button>` : ""].join("");
         return (g || h ? `<div class="front-goal">${gHtml}${hHtml}</div>` : "") + (add ? `<div class="front-add">${add}</div>` : ""); })()}
       ${hk ? (open.length ? `<div class="list">${open.map(t => taskRow(t)).join("")}</div>` : "") : `<div class="list">${open.map(t => taskRow(t)).join("")}
         <form class="add-line" data-form="add-task" data-front="${f.id}"><span class="plus">+</span>
@@ -1435,7 +1435,7 @@ function wzGoalOk(){
 }
 function wizardOpen(kind, frozen){
   const k = kind === "habit" ? "habit" : "project";
-  Object.assign(W, {step:0, kind:k, frozen:!!frozen, name:"", note:"", tasks:[], goal:{weekly:[]}, wantHabit:k === "habit" ? true : null, habit:HABIT0(k)});
+  Object.assign(W, {step:0, kind:k, frozen:!!frozen, name:"", note:"", tasks:[], goal:{weekly:[]}, goalSeen:false, wantHabit:k === "habit" ? true : null, habit:HABIT0(k)});
   openModal(wizardRender, false);
 }
 function wzCapture(){
@@ -1467,11 +1467,12 @@ function wizardRender(){
     <form class="add-line" data-form="wz-task" ${W.tasks.length ? "" : 'style="border-top:0"'}><span class="plus">+</span><input type="text" id="wz-task" placeholder="Nueva tarea" autocomplete="off" autofocus><select id="wz-min" aria-label="Minutos">${MINS(45)}</select><button class="text-btn" type="submit">Añadir</button></form></div>
     <div class="wz-nav">${back}${next}</div>`;
   const later = '<p class="muted" style="font-size:14px">Opcional. Las fechas las eliges al activarlo; desde ese día crece su bosque.</p>';
+  if (cur === "goal" && !hk && !W.goalSeen){ W.goalSeen = true; if (!W.goal.title) W.goal.title = `Completar ${W.name}`; } // propuesta escrita: el proyecto es el área, el objetivo la meta con fecha
   if (cur === "goal") body = hk ? `<h3 class="wz-q">${fz ? "¿Tiene una meta?" : "¿Tiene una meta con fecha?"}</h3>
     ${fz ? later : '<p class="muted" style="font-size:14px">Opcional. Ej: terminar Dune en 3 semanas. Tendrá su bosque.</p>'}
     ${goalFields(W.goal, {compact:true, noDates:fz})}
     <div class="wz-nav">${back}<span style="display:flex;gap:8px"><button class="btn" data-act="wz-skip">Sin objetivo</button><button class="btn primary" data-act="wz-create">Crear</button></span></div>`
-    : `<h3 class="wz-q">Objetivo de ${nm}</h3>${fz ? later : ""}
+    : `<h3 class="wz-q">Objetivo de ${nm}</h3>${fz ? later : `<p class="muted" style="font-size:14px">La meta con fecha de ${nm}: qué quieres lograr y para cuándo. De aquí salen sus semanas y su bosque.</p>`}
     ${goalFields(W.goal, {fixedFrontName:W.name, noStdMin:true, noDates:fz})}
     <div class="wz-nav">${back}<span style="display:flex;gap:8px"><button class="btn" data-act="wz-skip">Sin objetivo</button>${fz ? '<button class="btn primary" data-act="wz-create">Crear</button>' : next}</span></div>`;
   if (cur === "habit" && hk) body = `<h3 class="wz-q">¿Cuánto tiempo al día?</h3>

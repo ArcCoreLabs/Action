@@ -728,6 +728,13 @@ console.log('\nCalma visual');
   ok(await g.locator('> .list .trow').count() === 1 && /Todas las semanas \(10\)/.test(await g.textContent()), 'Metas muestra solo la semana actual y pliega las demás');
   ok(!p.errs.length && await noScroll(p) === 390, 'sin errores ni scroll ' + p.errs.join('|')); await p.close();
 }
+{ // el paso del objetivo trae una propuesta y explica qué es; un proyecto sin objetivo dice que no tiene bosque
+  const p = await open('light', { 'fronts/p1':{ name:'CCFA', status:'active', order:1, created:1 }, 'meta/settings':{}, 'meta/focus':{ days:{} } });
+  await nav(p, 'frentes'); ok(/\+ Objetivo · sin él no hay bosque/.test(await p.locator('#view').textContent()), 'un proyecto sin objetivo avisa que no tiene bosque');
+  await p.click('[data-act=front-new]:not([data-frozen])'); await p.fill('#wz-name', 'Jr Penetration Tester'); await p.click('[data-act=wz-next]'); await p.click('[data-act=wz-next]');
+  ok(await p.inputValue('#g-title') === 'Completar Jr Penetration Tester' && /De aquí salen sus semanas y su bosque/.test(await p.locator('.sheet').textContent()), 'el paso del objetivo trae una propuesta y explica que crea el bosque');
+  await p.click('[data-act=wz-skip]'); await p.click('[data-act=wz-back]'); ok(await p.inputValue('#g-title') === '', 'si eliges «Sin objetivo», la propuesta no vuelve'); await p.close();
+}
 // ---------- 7. hojas en iPhone ----------
 console.log('\nHojas en iPhone');
 { // con su aspecto nativo, el iPhone (RenderThemeIOS) pone a los campos de hora y fecha relleno de .5em y box-sizing:content-box
