@@ -820,7 +820,7 @@ console.log('\nMetas vivas');
       await g.locator('summary:text-is("Plan")').click(); await g.locator('summary:has-text("Todas las semanas")').click();
       await nav(p, 'hoy'); await nav(p, 'metas');
       ok(await g.locator('details[data-keep^=plan]').evaluate(e => e.open) && await g.locator('details[data-keep^=weeks]').evaluate(e => e.open), 'lo que abriste sigue abierto al volver a Metas');
-      await nav(p, 'semana'); ok(/Se marcó sola: llevas 1 de 1 tareas/.test(await p.locator('#view').textContent()), 'Semana también la muestra marcada sola');
+      await nav(p, 'semana'); ok(/Se marcó sola: llevas 1 de 1 tarea\b/.test(await p.locator('#view').textContent()), 'Semana también la muestra marcada sola');
     }
     ok(!p.errs.length && await noScroll(p) === 390, `${scheme}: sin errores ni scroll ` + p.errs.join('|')); await p.close();
   }
@@ -833,6 +833,8 @@ console.log('\nMetas vivas');
   await p.click('.main-task [data-act=done]'); await p.waitForTimeout(400); await nav(p, 'metas'); const g = p.locator('.goal'), t = await g.textContent();
   const w = await g.locator('.bar > span').evaluate(e => e.style.width);
   ok(/1\/5 tareas/.test(t) && w === '20%' && !(await g.locator('> .list .check.on').count()) && /llevas 1 de 5 tareas/.test(t) && !/Cumplido/.test(t), `con 1 de 5 labs la semana sigue abierta y la barra va al 20% (${w})`);
+  await nav(p, 'semana'); const sm = p.locator('.field-label:text-is("Tus objetivos")').locator('..');
+  ok(/Se marca sola al llegar a 5 tareas \(llevas 1\)/.test(await sm.textContent()) && !(await sm.locator('.check.on').count()), 'Semana tampoco la da por cumplida con 1 de 5');
   await nav(p, 'frentes'); const fr = p.locator('details.front:has(h2:text-is("THM"))');
   ok(/Hecha hoy/.test(await fr.locator('details[data-keep^=done]').textContent()) && !/Principal hoy/.test(await fr.locator('details[data-keep^=done]').textContent()), 'una tarea hecha dice "Hecha hoy", no "Principal hoy"');
   ok(!(await fr.locator('.fg-week.ok').count()), 'en Frentes la semana sigue como pendiente');
@@ -840,6 +842,7 @@ console.log('\nMetas vivas');
   await p.waitForTimeout(300);
   ok(await fr.locator('.fg-week.ok').count() === 1, 'con las 5 hechas, Frentes muestra la semana en verde');
   await nav(p, 'metas'); ok(/5\/5 tareas/.test(await g.textContent()) && await g.locator('> .list .check.on').count() === 1, 'y en Metas la semana se marca sola');
+  await nav(p, 'semana'); ok(/Se marcó sola: llevas 5 de 5 tareas/.test(await sm.textContent()) && await sm.locator('.check.on').count() === 1, 'y en Semana también');
   ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
 }
 // ---------- 6h. Frentes plegables ----------
