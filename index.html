@@ -437,6 +437,17 @@ details.front:not([open])>summary.front-head{margin-bottom:0}
 details.front:not([open]){padding-bottom:12px;border-bottom:1px solid var(--line)}
 .more-tasks{border-top:1px solid var(--line);padding:8px 0}
 .more-tasks>summary{font-size:12.5px}
+/* enfoque: salir siempre a mano; si ya empezó, se minimiza a una píldora que sigue contando */
+.focus-x{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));left:10px;color:var(--faint)}
+.focus-pill{position:fixed;z-index:40;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom,0px));display:flex;align-items:center;gap:8px;max-width:calc(100% - 32px);padding:7px 14px 7px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);box-shadow:0 4px 18px rgba(0,0,0,.12);cursor:pointer;font-size:12.5px}
+.fp-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex:none;animation:fp 1.6s ease-in-out infinite}
+.focus-pill.paused .fp-dot{animation:none;background:var(--faint)}
+.fp-time{font-weight:700;font-variant-numeric:tabular-nums}
+.fp-title{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+@keyframes fp{50%{opacity:.35}}
+@media (min-width:960px){.focus-pill{bottom:24px}}
+body:has(.focus-pill) .toast{bottom:calc(124px + env(safe-area-inset-bottom,0px))} /* el aviso no tapa la píldora */
+@media (min-width:960px){body:has(.focus-pill) .toast{bottom:72px}}
 .trow .tmeta.wk-tasks{display:grid;gap:1px;color:var(--ok)} /* lo que hiciste esa semana desde Hoy */
 /* ---------- calma: menos cosas que llaman la atención ---------- */
 .info{border-color:transparent;color:var(--faint);opacity:.75} /* la ayuda sigue ahí, pero ya no parece una alerta */
@@ -494,6 +505,7 @@ const DAYNAMES = ["domingo","lunes","martes","miércoles","jueves","viernes","s�
 const ICON = {
   more:'<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>',
   check:'<svg viewBox="0 0 16 16" fill="none"><path d="M3.5 8.5l3 3 6-7" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  down:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
   close:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>'
 };
 const exB = o => o && o.example ? '<span class="ex">ejemplo</span>' : "";
@@ -1603,15 +1615,19 @@ function nightRender(){
 
 /* ================= enfoque ================= */
 const F = { kind:"task", id:null, total:25*60, remain:25*60, endAt:0, running:false, timer:null, logged:0, finished:false, lock:null };
+const focusBusy = () => F.id && !F.finished && (F.running || F.remain < F.total); // hay una sesión empezada (corriendo o en pausa)
+function focusResume(){ F.mini = false; renderFocus(); toast("Primero termina esta sesión."); }
 function focusOpen(id){
+  if (focusBusy()) return focusResume();
   const t = task(id), m = (t && t.minutes) || 25;
-  Object.assign(F, { kind:"task", id, base:m, total:m*60, remain:m*60, running:false, finished:false, logged:0 });
+  Object.assign(F, { kind:"task", id, base:m, total:m*60, remain:m*60, running:false, finished:false, logged:0, mini:false });
   renderFocus();
 }
 function focusHabit(id){ // ▶ en un hábito con tiempo: arranca de una con lo que falta de hoy
+  if (focusBusy()) return focusResume();
   const h = S.habits.find(x => x.id === id); if (!h || !h.minutes) return;
   const d = today(), done = (h.time || {})[d] || 0, left = Math.max(1, h.minutes - done), g = forestGoal(h.frontId);
-  Object.assign(F, { kind:"habit", id, day:d, done0:done, base:left, total:left*60, remain:left*60, running:false, finished:false, logged:0,
+  Object.assign(F, { kind:"habit", id, day:d, done0:done, base:left, total:left*60, remain:left*60, running:false, finished:false, logged:0, mini:false,
     gid:g ? g.id : null, lvl0:g ? (forestMap(g)[d] || 0) : 0, wilt0:!!g && forestWilting(g) });
   startTimer(); renderFocus();
 }
@@ -1628,8 +1644,12 @@ function renderFocus(){
   if (!F.id){ $("#focus").innerHTML = ""; return; }
   const hk = F.kind === "habit", t = hk ? S.habits.find(x => x.id === F.id) : task(F.id);
   const m = Math.floor(F.remain/60), s = Math.floor(F.remain%60);
+  if (F.mini){ // minimizado: una píldora que sigue contando mientras usas la app; al tocarla vuelves
+    $("#focus").innerHTML = `<button class="focus-pill ${F.running ? "" : "paused"}" data-act="focus-max" aria-label="Volver al enfoque"><i class="fp-dot"></i><span class="fp-time" id="pillTime">${pad(m)}:${pad(s)}</span><span class="fp-title">${esc(t ? (hk ? t.name : t.title) : "")}</span></button>`;
+    return;
+  }
   const C = 2*Math.PI*54, frac = F.total ? F.remain/F.total : 0;
-  $("#focus").innerHTML = `<div class="focus" role="dialog" aria-modal="true" aria-label="Enfoque"><div class="focus-in">
+  $("#focus").innerHTML = `<div class="focus" role="dialog" aria-modal="true" aria-label="Enfoque"><button class="icon-btn focus-x" data-act="focus-x" aria-label="${focusBusy() ? "Minimizar: el tiempo sigue" : "Volver"}">${focusBusy() ? ICON.down : ICON.close}</button><div class="focus-in">
     <p class="eyebrow">${hk ? "Hábito" : "Enfoque"}</p>
     <h2>${esc(t ? (hk ? t.name : t.title) : "")}</h2>
     ${F.finished ? (hk ? habitDone(t) : `<p style="font-size:18px;font-weight:700">Sesión terminada.</p><p class="focus-note">¿Terminaste la tarea?</p>
@@ -1644,9 +1664,10 @@ function renderFocus(){
 function tick(){
   F.remain = Math.max(0, (F.endAt - Date.now())/1000);
   const el = $("#ringTime"), arc = $("#ringArc");
-  if (el){ const m = Math.floor(Math.ceil(F.remain)/60), s = Math.ceil(F.remain)%60; el.textContent = `${pad(m)}:${pad(s)}`; }
+  const pl = $("#pillTime"), txt = `${pad(Math.floor(Math.ceil(F.remain)/60))}:${pad(Math.ceil(F.remain)%60)}`;
+  if (el) el.textContent = txt; if (pl) pl.textContent = txt;
   if (arc){ const C = 2*Math.PI*54; arc.setAttribute("stroke-dashoffset", C*(1 - F.remain/F.total)); }
-  if (F.remain <= 0){ stopTimer(); logFocus(); F.finished = true; chime(); renderFocus(); }
+  if (F.remain <= 0){ stopTimer(); logFocus(); F.finished = true; F.mini = false; chime(); renderFocus(); } // al acabar, vuelve a pantalla completa aunque estuviera minimizado
 }
 function startTimer(){
   F.endAt = Date.now() + F.remain*1000; F.running = true;
@@ -1875,9 +1896,11 @@ Object.assign(A, {
   "focus-adj"(d){ const m = Math.max(5, Math.min(180, Math.round(F.total/60) + +d.n)); F.total = F.remain = m * 60; renderFocus(); },
   "focus-toggle"(){ if (F.running){ stopTimer(); F.remain = Math.max(0, (F.endAt - Date.now())/1000); logFocus(); } else startTimer(); renderFocus(); },
   "focus-stop"(){ if (F.running){ F.remain = Math.max(0, (F.endAt - Date.now())/1000); stopTimer(); } logFocus(); F.finished = true; renderFocus(); },
+  "focus-x"(){ if (focusBusy()){ F.mini = true; renderFocus(); toast("El tiempo sigue. Tócalo abajo para volver."); } else { stopTimer(); F.id = null; F.mini = false; renderFocus(); } }, // sin empezar o terminada: sale; empezada: se minimiza
+  "focus-max"(){ F.mini = false; renderFocus(); },
   "focus-finish"(d){ if (d.done && F.kind !== "habit"){ const t = task(F.id); if (t && !t.done) toggleDone(F.id); } F.id = null; renderFocus(); }
 });
-document.addEventListener("keydown", e => { if (e.key === "Escape" && modal.render && !modal.guard) closeModal(); });
+document.addEventListener("keydown", e => { if (e.key !== "Escape") return; if (F.id && !F.mini && $("#focus .focus")) return A["focus-x"](); if (modal.render && !modal.guard) closeModal(); });
 /* viento en el bosque: el dedo lo inclina mientras se mueve; al soltar, cada árbol vuelve meciéndose */
 const WIND = { svg:null, x:0, lean:0 };
 document.addEventListener("pointerdown", e => { const sv = e.target.closest && e.target.closest(".forest svg"); if (!sv) return; WIND.svg = sv; WIND.x = e.clientX; WIND.lean = 0; sv.classList.remove("calm"); });

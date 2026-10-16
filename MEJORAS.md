@@ -306,6 +306,12 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 - Ayuda de Objetivos: Plan es el cómo del objetivo, no otra meta.
 - Frentes: cada frente es un plegable (`<details data-fold>`, estado en `FOLD`): los proyectos empiezan abiertos y los hábitos plegados. El título resume («6 pendientes · 2 hechas» / «Hábito · lunes a viernes») y sus ⋯ no lo pliegan. Dentro: objetivo, las 3 tareas que siguen, «N tareas más» y «Hechas (N)» plegadas (recuerdan si las abriste).
 
+### Salir del enfoque *(fase 2 · hecha, falta publicar)*
+
+**Problema:** el temporizador a pantalla completa no tenía cómo devolverse sin empezar o terminar.
+
+**Hecho:** una × pequeña arriba a la izquierda (`focus-x`, también con Escape). Sin empezar o en la pantalla final, sale sin guardar nada. Empezada (corriendo o en pausa), se minimiza (`F.mini`) a una píldora sobre la barra de abajo que sigue contando («● 58:50 · tarea»); al tocarla vuelves, y al acabar el tiempo se abre sola con el aviso. Otro ▶ con una sesión empezada te devuelve a esa (`focusBusy`). Toda hoja ya tenía su × (probado en `tests/run.mjs`).
+
 ### Tarea 4: IA dentro de la app *(media)*
 
 Usar la capability `sample` (declararla: `sample:{}`). Se llama solo cuando el usuario toca un botón; nunca al cargar.

@@ -853,6 +853,47 @@ console.log('\nFrentes plegables');
     ok(!p.errs.length && await noScroll(p) === 390, `${scheme}: sin errores ni scroll ` + p.errs.join('|')); await p.close();
   }
 }
+// ---------- 6i. Salir del enfoque ----------
+console.log('\nSalir del enfoque');
+{ const seed = { 'fronts/a':{ name:'THM', status:'active', order:1, created:1 }, 'meta/settings':{}, 'meta/focus':{ days:{} },
+    'tasks/a1':{ title:'Guided Pentest: Web', frontId:'a', minutes:60, slot:'critical', date:TODAY, done:false, created:1 },
+    'tasks/a2':{ title:'Kill Chain', frontId:'a', minutes:30, slot:'secondary', date:TODAY, done:false, created:2 } };
+  for (const scheme of ['light', 'dark']){
+    const p = await open(scheme, seed); await p.waitForTimeout(300);
+    await p.click('.main-task [data-act=focus]'); ok(await p.locator('#focus .focus [data-act=focus-x]').count() === 1, `${scheme}: el enfoque tiene una × para salir`);
+    await p.screenshot({ path:path.join(out, `enfoque-salir-${scheme}.png`) });
+    await p.click('[data-act=focus-x]'); ok(await p.locator('#focus').innerHTML() === '' && !(await p.evaluate(() => JSON.stringify(window.__saved || []).includes('focus'))), `${scheme}: sin empezar, la × vuelve a Hoy sin guardar nada`);
+    // empezada: la × minimiza, el tiempo sigue en una píldora y al tocarla vuelves
+    await p.click('.main-task [data-act=focus]'); await p.click('[data-act=focus-toggle]'); await p.waitForTimeout(1300);
+    await p.click('[data-act=focus-x]'); await p.waitForTimeout(100);
+    const pill = p.locator('.focus-pill');
+    ok(await pill.count() === 1 && await p.locator('#focus .focus').count() === 0 && /Guided Pentest/.test(await pill.textContent()), `${scheme}: empezada, la × la minimiza a una píldora con el tiempo`);
+    const t1 = await p.locator('#pillTime').textContent(); await p.clock.setFixedTime(new Date(Date.parse(NOW) + 70000)); await p.waitForTimeout(400); const t2 = await p.locator('#pillTime').textContent(); // el reloj de la prueba está quieto: se adelanta 70 s
+    ok(t1 === '60:00' && t2 === '58:50', `${scheme}: el tiempo sigue corriendo minimizado (${t1} → ${t2})`);
+    await nav(p, 'frentes'); ok(await pill.count() === 1 && await p.evaluate(() => getComputedStyle(document.documentElement).overflowY) !== 'hidden', `${scheme}: con la píldora puedes moverte por la app`);
+    await p.screenshot({ path:path.join(out, `enfoque-pildora-${scheme}.png`) });
+    if (scheme === 'light'){
+      await nav(p, 'hoy'); await p.click('.trow:has-text("Kill Chain") [data-act=focus]'); await p.waitForTimeout(100);
+      ok(/Guided Pentest/.test(await p.locator('#focus .focus h2').textContent()) && /Primero termina/.test(await toastText(p)), 'otro ▶ con una sesión empezada te devuelve a la que va');
+      await p.keyboard.press('Escape'); await p.waitForTimeout(50); ok(await pill.count() === 1, 'Escape también minimiza');
+      await pill.click(); ok(await p.locator('#focus .focus [data-act=focus-stop]').count() === 1, 'tocar la píldora vuelve al enfoque');
+      await p.click('[data-act=focus-stop]'); ok(await p.locator('#focus .focus [data-act=focus-x]').count() === 1, 'la pantalla final también tiene ×');
+      await p.click('[data-act=focus-x]'); ok(await p.locator('#focus').innerHTML() === '', 'y la × de la pantalla final cierra');
+    }
+    ok(!p.errs.length && await noScroll(p) === 390, `${scheme}: sin errores ni scroll ` + p.errs.join('|')); await p.close();
+  }
+  // toda hoja tiene su × para devolverse
+  const p = await open('light', seed); await p.waitForTimeout(300); const missing = [];
+  const probe = async (name, go) => { await go(); await p.waitForTimeout(80); if (!(await p.locator('#modal .sheet-head [data-act=close]').count())) missing.push(name); await p.locator('#modal [data-act=close]').first().click().catch(() => {}); await p.waitForTimeout(50); };
+  await probe('Ajustes', () => p.click('[data-act=settings]'));
+  await probe('Opciones de tarea', () => p.click('.main-task [data-act=task-sheet]'));
+  await probe('Ayuda', () => p.click('.info >> nth=0'));
+  await probe('Planear mañana', () => p.click('[data-act=night] >> nth=0'));
+  await nav(p, 'frentes'); await probe('Opciones del frente', () => p.click('[data-act=front-sheet] >> nth=0'));
+  await probe('Nuevo frente', () => p.click('[data-act=front-new] >> nth=0'));
+  await nav(p, 'metas'); await probe('Nuevo objetivo', () => p.click('[data-act=goal-new] >> nth=0'));
+  ok(!missing.length, 'todas las hojas tienen × para devolverse ' + missing.join(', ')); await p.close();
+}
 // ---------- 7. hojas en iPhone ----------
 console.log('\nHojas en iPhone');
 { // con su aspecto nativo, el iPhone (RenderThemeIOS) pone a los campos de hora y fecha relleno de .5em y box-sizing:content-box
