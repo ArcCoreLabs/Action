@@ -448,6 +448,7 @@ details.front:not([open]){padding-bottom:12px;border-bottom:1px solid var(--line
 @media (min-width:960px){.focus-pill{bottom:24px}}
 body:has(.focus-pill) .toast{bottom:calc(124px + env(safe-area-inset-bottom,0px))} /* el aviso no tapa la píldora */
 @media (min-width:960px){body:has(.focus-pill) .toast{bottom:72px}}
+.fg-week.ok{color:var(--ok)}
 .trow .tmeta.wk-tasks{display:grid;gap:1px;color:var(--ok)} /* lo que hiciste esa semana desde Hoy */
 /* ---------- calma: menos cosas que llaman la atención ---------- */
 .info{border-color:transparent;color:var(--faint);opacity:.75} /* la ayuda sigue ahí, pero ya no parece una alerta */
@@ -574,7 +575,12 @@ const pauseFrom = f => { const p = (f.pauses || []).find(x => !x.to); return p ?
 const isFrozen = fid => { const f = front(fid); return !!f && f.status !== "active"; };
 const weekTasks = (g, i) => { if (!g.start || !g.deadline || !g.frontId) return []; const a = addDays(g.start, 7 * i), b = addDays(a, 6); // tareas del frente que terminaste en esa semana del objetivo
   return S.tasks.filter(t => t.frontId === g.frontId && t.done && t.doneAt && t.doneAt >= a && t.doneAt <= b && t.doneAt <= g.deadline).sort((x, y) => x.doneAt.localeCompare(y.doneAt)); };
-const weekDone = (g, i) => !!((g.weekly || [])[i] || {}).done || weekTasks(g, i).length > 0; // se marca sola con una tarea hecha; o a mano
+const goalTasks = g => S.tasks.filter(t => t.frontId === g.frontId && !t.someday && (!t.done || (t.doneAt && t.doneAt >= g.start && t.doneAt <= g.deadline))); // las del objetivo: pendientes + hechas en su plazo
+const weekQuota = g => { const T = g.start && g.deadline ? goalTasks(g).length : 0; return T ? Math.ceil(T / goalWeeks(g)) : 0; }; // tareas que le tocan a cada semana
+const weekPace = (g, i) => { const q = weekQuota(g); if (!q) return null; const T = goalTasks(g).length, end = addDays(g.start, 7 * i + 6); // cuántas llevas hasta esa semana y cuántas debías llevar
+  return { have:goalTasks(g).filter(t => t.done && t.doneAt <= end).length, need:Math.min(T, q * (i + 1)), q }; };
+const weekAuto = (g, i) => { const pc = weekPace(g, i); return !!pc && addDays(g.start, 7 * i) <= today() && pc.have >= pc.need; }; // se marca sola al completar su parte (lo adelantado cuenta)
+const weekDone = (g, i) => !!((g.weekly || [])[i] || {}).done || weekAuto(g, i); // o a mano
 const goalDone = g => { const N = g.start && g.deadline ? goalWeeks(g) : 0; return N > 0 && Array.from({length:N}, (_, i) => weekDone(g, i)).every(Boolean); }; // todas sus semanas marcadas («Cumplido»)
 const liveGoals = f => { const p = (f.pauses || []).find(x => !x.to), from = p ? p.from : today(); // los que seguían vivos al congelarlo (o se crearon sin fechas); primero los que tienen fechas
   return S.goals.filter(g => g.frontId === f.id && (!g.deadline || g.deadline >= from) && !goalDone(g)).sort((a,b) => String(a.start||"9999").localeCompare(String(b.start||"9999"))); };
@@ -668,13 +674,38 @@ function forestGrowMsg(g, from, to, save){
   return msg + (save ? " Salvaste el que se marchitaba." : "");
 }
 // Piezas en coordenadas locales: (0,0) es el centro del espacio en el suelo; la isla usa espacios de 20×10.
+// Árboles con relieve: la copa se arma con matas de borde irregular (como hojas), oscuras abajo a la derecha y con luz arriba a la izquierda;
+// el tronco se ensancha en la base y tiene ramas. Todo sale de una semilla fija: cada especie se ve siempre igual.
+const r1 = n => Math.round(n * 10) / 10;
+const rnd = seed => () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+const leafy = (x, y, r, seed, n = 11) => { const q = rnd(seed), pts = []; // contorno con bultos de hojas
+  for (let i = 0; i < n; i++){ const a = i / n * Math.PI * 2 + q() * .3, rr = r * (.84 + q() * .16); pts.push([x + Math.cos(a) * rr, y + Math.sin(a) * rr]); }
+  return "M" + pts.map((pt, i) => { const nx = pts[(i + 1) % n], ch = Math.hypot(nx[0] - pt[0], nx[1] - pt[1]); return `${i ? "" : r1(pt[0]) + " " + r1(pt[1])}A${r1(ch * .62)} ${r1(ch * .62)} 0 0 1 ${r1(nx[0])} ${r1(nx[1])}`; }).join("") + "z"; };
+const clump = (x, y, r, seed, back) => { const q = rnd(seed * 7 + 3);
+  if (back) return `<path class="lf" d="${leafy(x, y, r, seed)}"/><path class="sh" d="${leafy(x, y, r, seed)}"/>`; // atrás: más oscura, da profundidad
+  let dots = ""; for (let i = 0; i < 3; i++){ const a = q() * 6.28, d = r * (.3 + q() * .45); dots += `<circle class="sh" cx="${r1(x + Math.cos(a) * d)}" cy="${r1(y + Math.sin(a) * d * .8 + r * .15)}" r="${r1(r * .09 + .15)}"/>`; } // hojas en sombra: textura
+  return `<path class="lf" d="${leafy(x, y, r, seed)}"/><path class="lf2" d="${leafy(x - r * .16, y - r * .2, r * .76, seed + 1, 9)}"/>`
+    + `<path class="hi" d="${leafy(x - r * .34, y - r * .4, r * .36, seed + 2, 7)}"/>${dots}`; };
+const tier = (w, base, h, seed) => { const q = rnd(seed), top = base - h, p = (x, y) => `${r1(x)} ${r1(y)}`; // un piso de pino: ramas que cuelgan en puntas irregulares
+  const edge = []; for (let i = 1; i < 9; i++){ const x = w - i * w * 2 / 9; edge.push([x, base - (i % 2 ? .9 + q() * .5 : .1 + q() * .3)]); }
+  const side = (sgn) => `L${p(sgn * w * .5, top + h * .45)}L${p(sgn * w * .38, top + h * .5)}`; // un diente a media altura de cada lado
+  return `<path class="lf" d="M${p(0, top)}${side(1)}L${p(w, base)}${edge.map(([x, y]) => "L" + p(x, y)).join("")}L${p(-w, base)}L${p(-w * .38, top + h * .5)}L${p(-w * .5, top + h * .45)}z"/>`
+    + `<path class="sh" d="M${p(0, top)}${side(1)}L${p(w, base)}${edge.slice(0, 4).map(([x, y]) => "L" + p(x, y)).join("")}L${p(0, base - .5)}z"/>`
+    + `<path class="hi" d="M${p(-.1, top + .4)}L${p(-w * .3, top + h * .42)}L${p(-w * .12, top + h * .38)}z"/>`; };
+const fruitAt = pts => pts.map(([x, y]) => `<circle class="fruit" cx="${x}" cy="${y}" r=".95"/>`).join("");
+const TRUNK = (w, h) => `<path class="tk" d="M${-w - .6} .2Q${-w} -.6 ${-w * .55} ${-h * .5}L${-w * .4} ${-h}H${w * .4}L${w * .55} ${-h * .5}Q${w} -.6 ${w + .6} .2z"/><path class="sh" d="M${w * .1} .2L${w * .2} ${-h}H${w * .4}L${w * .55} ${-h * .5}Q${w} -.6 ${w + .6} .2z"/><path class="sh" d="M${-w * .3} ${-h * .25}l.1 -1.4M${-w * .05} ${-h * .62}l.1 -1.2" stroke="var(--shade)" stroke-width=".25" fill="none"/>`;
 const TREES = [
-  {body:'<rect class="tk" x="-.9" y="-3.6" width="1.8" height="3.8" rx=".5"/><path class="lf" d="M0-12.4L6.4-3.2H-6.4z"/><path class="sh" d="M0-12.4L6.4-3.2H0z"/><path class="lf" d="M0-15.8L5.2-7.6H-5.2z"/><path class="sh" d="M0-15.8L5.2-7.6H0z"/><path class="lf" d="M0-19.2L3.8-11.6H-3.8z"/><path class="sh" d="M0-19.2L3.8-11.6H0z"/>',
-   fruit:'<circle class="fruit" cx="-2.6" cy="-5" r="1.1"/><circle class="fruit" cx="2.4" cy="-9.6" r="1.1"/><circle class="fruit" cx="0" cy="-19" r="1.2"/>'},
-  {body:'<rect class="tk" x="-1" y="-6" width="2" height="6.2" rx=".6"/><circle class="lf2" cx="0" cy="-11" r="6.2"/><path class="sh" d="M0-4.8A6.2 6.2 0 0 0 6.2-11A6.2 6.2 0 0 0 0-17.2A4.6 6.2 0 0 1 0-4.8z"/><circle class="hi" cx="-2.2" cy="-13.4" r="2.4"/>',
-   fruit:'<circle class="fruit" cx="-3.2" cy="-9.6" r="1.1"/><circle class="fruit" cx="3" cy="-12.4" r="1.1"/><circle class="fruit" cx=".6" cy="-7.2" r="1.1"/>'},
-  {body:'<rect class="tk" x="-.9" y="-4" width="1.8" height="4.2" rx=".5"/><ellipse class="lf" cx="0" cy="-11.6" rx="4.1" ry="8.2"/><path class="sh" d="M0-3.4A4.1 8.2 0 0 0 0-19.8A2.4 8.2 0 0 1 0-3.4z"/><ellipse class="hi" cx="-1.5" cy="-14.2" rx="1.3" ry="3.4"/>',
-   fruit:'<circle class="fruit" cx="-1.6" cy="-8.6" r="1"/><circle class="fruit" cx="1.8" cy="-13" r="1"/><circle class="fruit" cx="0" cy="-17.6" r="1"/>'}
+  { // pino: pisos de ramas que se encogen hacia arriba
+    body:TRUNK(.7, 4.5) + [[6.6, -3], [5.5, -6.1], [4.4, -9.1], [3.2, -12], [2.1, -14.7]].map(([w, b], i) => tier(w, b, 5.2, 11 + i)).join(""),
+    fruit:fruitAt([[-3, -4.4], [2.6, -7.9], [-1.4, -13]])},
+  { // roble: tronco con ramas y una copa ancha de varias matas
+    body:TRUNK(1, 6) + '<path class="tk" d="M-.5-5.4L-2.9-8.8L-2.3-9.2L0-6.6zM.4-5.6L2.7-8.7L3.2-8.2L.9-5z"/>'
+      + [[-3.4, -10.4, 3.5, 1], [3.5, -10.8, 3.5, 1], [0, -15, 3.9, 1], [-4.4, -8, 2.9], [4.5, -8.2, 2.9], [-2, -12.6, 3.4], [2.3, -13, 3.3], [0, -9, 3.2], [-.3, -16, 2.5]].map(([x, y, r, k], i) => clump(x, y, r, 101 + i * 13, k)).join(""),
+    fruit:fruitAt([[-3.6, -8.6], [3.4, -11.4], [.5, -9.6]])},
+  { // ciprés: alto y angosto, matas pequeñas apiladas
+    body:TRUNK(.6, 3.6)
+      + [[-1.5, -5.6, 2.4, 1], [1.5, -6, 2.4, 1], [-1.3, -10, 2.3, 1], [1.3, -10.4, 2.3, 1], [0, -7.6, 2.6], [-1.2, -12.4, 2.2], [1.2, -12.8, 2.1], [0, -10.2, 2.4], [-.8, -15, 1.9], [.9, -15.3, 1.8], [0, -17.4, 1.7], [0, -19.2, 1.2]].map(([x, y, r, k], i) => clump(x, y, r, 307 + i * 17, k)).join(""),
+    fruit:fruitAt([[-1.4, -7.4], [1.4, -12.6], [-.4, -16.4]])}
 ];
 const ART = {
   sprout:'<path class="stem" d="M0 0V-4.2"/><ellipse class="lf2" cx="-1.8" cy="-4.5" rx="2.1" ry="1" transform="rotate(-25 -1.8 -4.5)"/><ellipse class="lf2" cx="1.8" cy="-4.5" rx="2.1" ry="1" transform="rotate(25 1.8 -4.5)"/>',
@@ -837,7 +868,7 @@ const dash = (label, act, attrs = "") => `<button class="dash" data-act="${act}"
 
 function taskRow(t, opts = {}){
   const f = front(t.frontId);
-  const when = !opts.noWhen && t.slot && t.date && t.date >= today() ? `<span class="${t.slot === "critical" ? "acc" : ""}">${t.slot === "critical" ? "Principal" : "Extra"} ${dayWord(t.date)}</span>` : "";
+  const when = t.done ? (t.doneAt && !opts.noWhen ? `<span>Hecha ${dayWord(t.doneAt)}</span>` : "") : !opts.noWhen && t.slot && t.date && t.date >= today() ? `<span class="${t.slot === "critical" ? "acc" : ""}">${t.slot === "critical" ? "Principal" : "Extra"} ${dayWord(t.date)}</span>` : "";
   const meta = join([when, opts.showFront && f ? esc(f.name) : "", t.minutes ? `${t.minutes} min` : ""]);
   return `<div class="trow ${t.done ? "done" : ""}">
     <button class="check ${t.done ? "on" : ""}" data-act="done" data-id="${t.id}" aria-label="${t.done ? "Desmarcar" : "Marcar hecha"}">${ICON.check}</button>
@@ -951,7 +982,7 @@ VIEWS.frentes = function(){
         const gHtml = g ? (() => { const wk = goalWeek(g), n = goalWeeks(g), cur = (g.weekly || [])[Math.max(0, wk-1)];
           const tr = wk && forestOn(g) ? forestStats(g, forestDays(g)).trees : 0;
           if (!g.start || !g.deadline) return `<span class="tmeta">Objetivo · sin fechas</span><b>${esc(g.title)}</b>`;
-          return `<span class="tmeta">${wk ? `Objetivo · ${hk && g.start && g.deadline ? `día ${Math.min(diffDays(g.start, today()) + 1, diffDays(g.start, g.deadline) + 1)} de ${diffDays(g.start, g.deadline) + 1}` : `semana ${wk} de ${n}`}${tr ? ` · ${plural(tr, "árbol", "árboles")}` : ""}` : `Objetivo · empieza el ${fmtShort(g.start)}`}</span><b>${esc(g.title)}</b>${!hk && cur && cur.text ? `<span class="fg-week">${wk ? "Esta semana" : "Primera semana"}: ${esc(cur.text)}</span>` : ""}`; })() : "";
+          return `<span class="tmeta">${wk ? `Objetivo · ${hk && g.start && g.deadline ? `día ${Math.min(diffDays(g.start, today()) + 1, diffDays(g.start, g.deadline) + 1)} de ${diffDays(g.start, g.deadline) + 1}` : `semana ${wk} de ${n}`}${tr ? ` · ${plural(tr, "árbol", "árboles")}` : ""}` : `Objetivo · empieza el ${fmtShort(g.start)}`}</span><b>${esc(g.title)}</b>${!hk && cur && cur.text ? `<span class="fg-week ${wk && weekDone(g, wk-1) ? "ok" : ""}">${wk && weekDone(g, wk-1) ? "✓ " : ""}${wk ? "Esta semana" : "Primera semana"}: ${esc(cur.text)}</span>` : ""}`; })() : "";
         const hHtml = h ? `<span class="tmeta fg-habit">Hábito · ${esc(daysLabel(h.days))}${h.minutes ? ` · ${h.minutes} min · mínimo ${h.minMinutes || h.minutes} min` : `${h.minimum ? ` · mínimo ${esc(h.minimum)}` : ""}${h.standard ? ` · estándar ${esc(h.standard)}` : ""}`}</span>` : "";
         const add = [!g ? `<button class="text-btn muted" data-act="goal-new" data-front="${f.id}">+ Objetivo${hk ? "" : " · sin él no hay bosque"}</button>` : "", !h ? `<button class="text-btn muted" data-act="habit-quick" data-front="${f.id}">+ Hábito</button>` : ""].join("");
         return (g || h ? `<div class="front-goal">${gHtml}${hHtml}</div>` : "") + (add ? `<div class="front-add">${add}</div>` : ""); })()}
@@ -991,20 +1022,21 @@ VIEWS.metas = function(){
     const doneN = Array.from({length:N}, (_, i) => weekDone(g, i)).filter(Boolean).length;
     const elapsed = g.start && g.deadline ? Math.max(0, Math.min(100, diffDays(g.start, today()) / Math.max(1, diffDays(g.start, g.deadline)) * 100)) : 0;
     const pm = (g.premortem || []).filter(p => p && (p.cause || p.counter));
-    const items = Array.from({length:N}, (_, i) => ({...(weekly[i] || {}), i, done:weekDone(g, i), ts:weekTasks(g, i)}));
+    const items = Array.from({length:N}, (_, i) => ({...(weekly[i] || {}), i, done:weekDone(g, i), ts:weekTasks(g, i), pc:weekPace(g, i)}));
     const hk = isHabitFront(f), all = hk && forestOn(g) ? forestDays(g, true) : null, fst = all ? forestStats(g, all) : null, hit = fst ? fst.trees + fst.sprouts : 0;
+    const gt = !hk && dated ? goalTasks(g) : [], gtDone = gt.filter(t => t.done).length; // un proyecto avanza por tareas
     const hsF = S.habits.filter(h => h.frontId === g.frontId), gMin = (hsF[0] || {}).minimum || g.minimum, gStd = (hsF[0] || {}).standard || g.standard; // fuente única: el hábito (si está vacío, el de la meta vieja)
     const plan = all ? all.filter(x => x.lvl || (x.d >= today() ? hsF.some(h => daysOn(h, x.d)) : x.state !== "rest")).length : 0; // días que tocan: un hábito avanza por días, no por semanas
     return `<section class="goal">
       <div class="front-head"><div class="tmain"><span class="tmeta">${esc(f ? f.name : "Sin frente")}</span><h2>${esc(g.title || "Objetivo sin nombre")}</h2></div>
         <button class="more" data-act="goal-sheet" data-id="${g.id}" aria-label="Opciones">${ICON.more}</button></div>
-      <div>${dated ? `<div class="bar"><span style="width:${fst ? hit / Math.max(1, plan) * 100 : doneN/N*100}%"></span><i style="left:${elapsed}%"></i></div>` : ""}
-        <p class="bar-legend">${!dated ? "Sin fechas · ponlas en ⋯ → Editar" : join([g.start && today() < g.start ? `Empieza el ${fmtShort(g.start)}` : g.deadline && today() > g.deadline ? (hk ? "Terminó" : doneN === N ? "Cumplido" : "Plazo vencido") : fst ? `Día ${diffDays(g.start, today()) + 1} de ${fst.total}` : `Semana ${wk} de ${N}`, fst ? plural(hit, "día cumplido", "días cumplidos") : `${doneN}/${N} semanas cumplidas`, g.deadline && today() <= g.deadline ? `faltan ${diffDays(today(), g.deadline)} días` : ""])}</p></div>
+      <div>${dated ? `<div class="bar"><span style="width:${fst ? hit / Math.max(1, plan) * 100 : gt.length ? gtDone / gt.length * 100 : doneN/N*100}%"></span><i style="left:${elapsed}%"></i></div>` : ""}
+        <p class="bar-legend">${!dated ? "Sin fechas · ponlas en ⋯ → Editar" : join([g.start && today() < g.start ? `Empieza el ${fmtShort(g.start)}` : g.deadline && today() > g.deadline ? (hk ? "Terminó" : doneN === N ? "Cumplido" : "Plazo vencido") : fst ? `Día ${diffDays(g.start, today()) + 1} de ${fst.total}` : `Semana ${wk} de ${N}`, fst ? plural(hit, "día cumplido", "días cumplidos") : gt.length ? `${gtDone}/${gt.length} tareas` : `${doneN}/${N} semanas cumplidas`, g.deadline && today() <= g.deadline ? `faltan ${diffDays(today(), g.deadline)} días` : ""])}</p></div>
       ${forestOn(g) ? forestBlock(g) : ""}
       ${items.length && !hk ? (() => { const shown = w => w.i + 1 === (wkNow || (wk === 0 ? 1 : 0)); // a la vista solo esta semana; las demás, plegadas
         const row = w => `<div class="trow ${w.done ? "done" : ""} ${w.i + 1 === wkNow ? "cur" : ""}">
         <button class="check ${w.done ? "on" : ""}" data-act="goal-week" data-id="${g.id}" data-i="${w.i}" aria-label="Marcar semana ${w.i + 1}">${ICON.check}</button>
-        <div class="tmain"><span class="ttitle">${w.text ? esc(w.text) : '<span class="muted">Sin definir</span>'}</span><span class="tmeta">Semana ${w.i + 1}${w.i + 1 === wkNow ? " · esta semana" : ""}</span>${w.ts.length ? `<span class="tmeta wk-tasks">${w.ts.map(t => `<span>✓ ${esc(t.title)}</span>`).join("")}</span>` : ""}</div></div>`;
+        <div class="tmain"><span class="ttitle">${w.text ? esc(w.text) : '<span class="muted">Sin definir</span>'}</span><span class="tmeta">${join([`Semana ${w.i + 1}${w.i + 1 === wkNow ? " · esta semana" : ""}`, !w.done && w.pc && w.i + 1 <= (wkNow || 99) ? `llevas ${w.pc.have} de ${w.pc.need} tareas` : ""])}</span>${w.ts.length ? `<span class="tmeta wk-tasks">${w.ts.map(t => `<span>✓ ${esc(t.title)}</span>`).join("")}</span>` : ""}</div></div>`;
         const vis = items.filter(shown);
         return `${vis.length ? `<div class="list">${vis.map(row).join("")}</div>` : ""}${vis.length < items.length ? `<details data-keep="weeks-${g.id}" ${KEEP.has("weeks-" + g.id) ? "open" : ""}><summary>Todas las semanas (${doneN}/${items.length})</summary><div class="d-body"><div class="list">${items.map(row).join("")}</div></div></details>` : ""}`; })() : ""}
       ${(gMin || g.trigger || gStd || g.why || pm.length) ? `<details data-keep="plan-${g.id}" ${KEEP.has("plan-" + g.id) ? "open" : ""}><summary>Plan</summary><div class="d-body kvs">
@@ -1059,7 +1091,7 @@ VIEWS.semana = function(){
     ${(() => { const gs = act.filter(f => !isHabitFront(f)).map(f => goalFor(f.id)).filter(g => g && g.start && g.deadline); if (!gs.length) return "";
       return `<div class="qa" style="gap:14px"><span class="field-label">Tus objetivos</span>${gs.map(g => { const wk = goalWeek(g), N = goalWeeks(g), w = g.weekly || [], cur = w[wk-1] || {}, nx = w[wk] || {};
         return `<div class="stack" style="gap:8px"><span class="tmeta">${esc(g.title)}</span>
-          ${wk === 0 ? "" : `<div class="trow" style="border-top:0;padding:0;min-height:44px"><button class="check ${weekDone(g, wk-1) ? "on" : ""}" data-act="goal-week" data-id="${g.id}" data-i="${wk-1}" aria-label="Cumplí la semana">${ICON.check}</button><div class="tmain"><span class="ttitle">Semana ${wk}: ${cur.text ? esc(cur.text) : "sin definir"}</span><span class="tmeta">${(n => n ? `Se marcó sola: ${plural(n, "tarea hecha", "tareas hechas")}` : "Márcala si la cumpliste")(weekTasks(g, wk-1).length)}</span></div></div>`}
+          ${wk === 0 ? "" : `<div class="trow" style="border-top:0;padding:0;min-height:44px"><button class="check ${weekDone(g, wk-1) ? "on" : ""}" data-act="goal-week" data-id="${g.id}" data-i="${wk-1}" aria-label="Cumplí la semana">${ICON.check}</button><div class="tmain"><span class="ttitle">Semana ${wk}: ${cur.text ? esc(cur.text) : "sin definir"}</span><span class="tmeta">${(pc => weekAuto(g, wk-1) ? `Se marcó sola: llevas ${pc.have} de ${pc.need} tareas` : pc ? `Se marca sola al llegar a ${pc.need} tareas (llevas ${pc.have})` : "Márcala si la cumpliste")(weekPace(g, wk-1))}</span></div></div>`}
           ${wk < N ? `<label class="field" for="rv-w-${g.id}"><span class="tmeta">${wk === 0 ? "Semana 1 (empieza el " + fmtShort(g.start) + ")" : "Semana " + (wk+1)}: ¿qué debe estar hecho?</span><input type="text" id="rv-w-${g.id}" data-week-goal="${g.id}" data-i="${wk}" value="${esc(nx.text || "")}"></label>` : '<span class="tmeta">Es la última semana del objetivo.</span>'}</div>`; }).join("")}</div>`; })()}
     <button class="btn primary block" data-act="review-close">${r.closed ? "Guardar cambios" : "Cerrar revisión"}</button>
   </div></section>
@@ -1081,7 +1113,7 @@ const HELP = {
   congelados:["Congelados", ["Proyectos e ideas que te interesan pero no son para ahora.", "No se pierden: quedan guardados con sus tareas (las ves en <b>⋯</b>).", "Toca <b>Activar</b> en un frente: si tiene objetivo, ahí eliges sus fechas (si ya tenía avance, su bosque sigue). Si ya tienes 2 proyectos activos, ahí mismo congelas uno.", "<b>Nuevo</b> crea un frente que empieza congelado.", "<b>Ideas</b>: lo que congelaste desde la Bandeja. <b>Activar</b> la devuelve a la Bandeja; <b>⋯</b> la mueve a un frente."]],
   metas:["Metas", ["De lo grande a lo pequeño:", "<b>Visión</b>: hacia dónde vas en años.", "<b>Objetivo</b>: lo que logras entre una fecha de inicio y una fecha límite.", "<b>Semanas</b>: lo que debe estar hecho cada domingo.", "Las tareas del día van en Frentes."]],
   vision:["Visión", ["Una o dos frases sobre hacia dónde vas en los próximos años.", "Solo da dirección, no es una tarea."]],
-  objetivos:["Objetivos", ["Un resultado medible con fecha límite, como “Aprobar la CCFA”.", "Las semanas salen solas de tus fechas: 4 semanas si pones un mes, 12 si pones tres.", "Si es de un hábito no tiene semanas: avanza por días (Día 5 de 23 · 4 días cumplidos).", "Escribe qué debe estar hecho cada semana. Cuando terminas en Hoy una tarea del frente, la semana se marca sola y debajo ves lo que hiciste; si avanzaste por fuera, márcala tú.", "A la vista queda solo esta semana; las demás están en <b>Todas las semanas</b>.", "En <b>Plan</b> quedan tu mínimo, cuándo lo haces, por qué y qué podría salir mal: es el cómo del objetivo, no otra meta.", "Los de frentes congelados quedan plegados en <b>Congelados</b>, sin fechas ni bosque, hasta que actives el frente.", "El <b>bosque</b> crece con cada día que avanzas en el frente.", "La línea naranja de la barra marca el tiempo que ha pasado."]],
+  objetivos:["Objetivos", ["Un resultado medible con fecha límite, como “Aprobar la CCFA”.", "Las semanas salen solas de tus fechas: 4 semanas si pones un mes, 12 si pones tres.", "Si es de un hábito no tiene semanas: avanza por días (Día 5 de 23 · 4 días cumplidos).", "Un proyecto avanza por tareas: la barra cuenta las que llevas de su frente. A cada semana le toca su parte (5 tareas en 1 semana = 5; 10 en 5 semanas = 2) y se marca sola cuando la completas; lo que adelantes cuenta. Debajo ves lo que hiciste. Si avanzaste por fuera, márcala tú.", "A la vista queda solo esta semana; las demás están en <b>Todas las semanas</b>.", "En <b>Plan</b> quedan tu mínimo, cuándo lo haces, por qué y qué podría salir mal: es el cómo del objetivo, no otra meta.", "Los de frentes congelados quedan plegados en <b>Congelados</b>, sin fechas ni bosque, hasta que actives el frente.", "El <b>bosque</b> crece con cada día que avanzas en el frente.", "La línea naranja de la barra marca el tiempo que ha pasado."]],
   semana:["Semana", ["Arriba ves tus números de la semana.", "El domingo, en 30 minutos, respondes la revisión y defines la meta de la próxima semana."]],
   revision:["Revisión", ["Responde con frases cortas.", "En <b>¿Qué voy a cambiar?</b> cambia el sistema, no a ti: un horario, un mínimo, una regla.", "Marca si cumpliste la semana de cada objetivo y escribe qué debe estar hecho la próxima.", "Después crea en Frentes las tareas de esa semana."]],
   anteriores:["Anteriores", ["Tus revisiones pasadas, para ver cómo vas."]],
@@ -1800,7 +1832,7 @@ const A = {
   "goal-edit"(d){ goalForm(d.id); },
   "goal-dup"(d){ goalForm(null, d.id); },
   "goal-del"(d){ if (confirmTap("gdel-" + d.id)){ remove("goals", d.id); closeModal(); } },
-  "goal-week"(d){ const g = S.goals.find(x => x.id === d.id); if (!g) return; const n = weekTasks(g, +d.i).length; if (n) return toast(`Esta semana se marcó sola: hiciste ${plural(n, "tarea", "tareas")} de este proyecto.`); const w = Array.from({length:Math.max(goalWeeks(g), (g.weekly || []).length)}, (_, i) => ({text:"", done:false, ...((g.weekly || [])[i] || {})})); w[+d.i].done = !w[+d.i].done; put("goals", {...g, weekly:w}); },
+  "goal-week"(d){ const g = S.goals.find(x => x.id === d.id); if (!g) return; if (weekAuto(g, +d.i)){ const pc = weekPace(g, +d.i); return toast(`Esta semana se marcó sola: llevas ${pc.have} de ${pc.need} tareas.`); } const w = Array.from({length:Math.max(goalWeeks(g), (g.weekly || []).length)}, (_, i) => ({text:"", done:false, ...((g.weekly || [])[i] || {})})); w[+d.i].done = !w[+d.i].done; put("goals", {...g, weekly:w}); },
   backup(){ backupSave(); },
   "restore-do"(d, el, e){ if (!RS || restoring) return; if (confirmKey === "restore" && e.timeStamp - RS.armed < 400) return;
     if (!confirmTap("restore")){ RS.armed = e.timeStamp; return; } restoreRun(RS.data); },

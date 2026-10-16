@@ -808,11 +808,11 @@ console.log('\nMetas vivas');
   for (const scheme of ['light', 'dark']){
     const p = await open(scheme, seed); await p.waitForTimeout(400);
     await nav(p, 'metas'); const g = p.locator('.goal');
-    ok(/0\/10 semanas cumplidas/.test(await g.textContent()) && !(await g.locator('> .list .check.on').count()), `${scheme}: antes de hacer nada la semana 1 está sin marcar`);
+    ok(/0\/2 tareas/.test(await g.textContent()) && !(await g.locator('> .list .check.on').count()), `${scheme}: antes de hacer nada la semana 1 está sin marcar`);
     ok(await g.locator('> .list .trow').count() === 1 && await g.locator('details[data-keep^=weeks]').evaluate(e => !e.open), `${scheme}: solo se ve esta semana; las otras 9 y el Plan quedan plegados`);
     await nav(p, 'hoy'); await p.click('.main-task:has-text("Definir módulos") [data-act=done]'); await p.waitForTimeout(400); await nav(p, 'metas');
     const t = await g.textContent();
-    ok(/1\/10 semanas cumplidas/.test(t) && await g.locator('> .list .check.on').count() === 1 && /✓ Definir módulos/.test(t) && /Todas las semanas \(1\/10\)/.test(t), `${scheme}: al terminar la tarea en Hoy, la semana se marca sola y muestra lo que hiciste`);
+    ok(/1\/2 tareas/.test(t) && await g.locator('> .list .check.on').count() === 1 && /✓ Definir módulos/.test(t) && /Todas las semanas \(1\/10\)/.test(t), `${scheme}: al terminar la tarea en Hoy, la semana se marca sola y muestra lo que hiciste`);
     await p.evaluate(() => { document.getElementById('toastRoot').innerHTML = ''; }); await g.screenshot({ path:path.join(out, `metas-vivas-${scheme}.png`) });
     if (scheme === 'light'){
       await g.locator('> .list [data-act=goal-week]').click(); const tt = await toastText(p);
@@ -820,10 +820,27 @@ console.log('\nMetas vivas');
       await g.locator('summary:text-is("Plan")').click(); await g.locator('summary:has-text("Todas las semanas")').click();
       await nav(p, 'hoy'); await nav(p, 'metas');
       ok(await g.locator('details[data-keep^=plan]').evaluate(e => e.open) && await g.locator('details[data-keep^=weeks]').evaluate(e => e.open), 'lo que abriste sigue abierto al volver a Metas');
-      await nav(p, 'semana'); ok(/Se marcó sola: 1 tarea hecha/.test(await p.locator('#view').textContent()), 'Semana también la muestra marcada sola');
+      await nav(p, 'semana'); ok(/Se marcó sola: llevas 1 de 1 tareas/.test(await p.locator('#view').textContent()), 'Semana también la muestra marcada sola');
     }
     ok(!p.errs.length && await noScroll(p) === 390, `${scheme}: sin errores ni scroll ` + p.errs.join('|')); await p.close();
   }
+}
+{ // THM: 5 tareas y un objetivo de 1 semana. Una hecha no basta: la semana pide las 5 y la barra va por tareas
+  const seed = { 'fronts/b':{ name:'THM', status:'active', order:1, created:1 }, 'meta/settings':{}, 'meta/focus':{ days:{} },
+    'goals/gb':{ title:'Completar THM', frontId:'b', start:TODAY, deadline:add(TODAY, 3), created:1, weekly:[{ text:'Foundation completo', done:false }] } };
+  for (let i = 1; i <= 5; i++) seed['tasks/l' + i] = { title:'Lab ' + i, frontId:'b', minutes:60, slot:i === 1 ? 'critical' : null, date:i === 1 ? TODAY : null, done:false, created:i };
+  const p = await open('dark', seed); await p.waitForTimeout(400);
+  await p.click('.main-task [data-act=done]'); await p.waitForTimeout(400); await nav(p, 'metas'); const g = p.locator('.goal'), t = await g.textContent();
+  const w = await g.locator('.bar > span').evaluate(e => e.style.width);
+  ok(/1\/5 tareas/.test(t) && w === '20%' && !(await g.locator('> .list .check.on').count()) && /llevas 1 de 5 tareas/.test(t) && !/Cumplido/.test(t), `con 1 de 5 labs la semana sigue abierta y la barra va al 20% (${w})`);
+  await nav(p, 'frentes'); const fr = p.locator('details.front:has(h2:text-is("THM"))');
+  ok(/Hecha hoy/.test(await fr.locator('details[data-keep^=done]').textContent()) && !/Principal hoy/.test(await fr.locator('details[data-keep^=done]').textContent()), 'una tarea hecha dice "Hecha hoy", no "Principal hoy"');
+  ok(!(await fr.locator('.fg-week.ok').count()), 'en Frentes la semana sigue como pendiente');
+  for (let i = 0; i < 4; i++){ await fr.locator('.front-body > .list > .trow [data-act=done]').first().click(); await p.waitForTimeout(250); }
+  await p.waitForTimeout(300);
+  ok(await fr.locator('.fg-week.ok').count() === 1, 'con las 5 hechas, Frentes muestra la semana en verde');
+  await nav(p, 'metas'); ok(/5\/5 tareas/.test(await g.textContent()) && await g.locator('> .list .check.on').count() === 1, 'y en Metas la semana se marca sola');
+  ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
 }
 // ---------- 6h. Frentes plegables ----------
 console.log('\nFrentes plegables');

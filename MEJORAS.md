@@ -312,6 +312,16 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 
 **Hecho:** una × pequeña arriba a la izquierda (`focus-x`, también con Escape). Sin empezar o en la pantalla final, sale sin guardar nada. Empezada (corriendo o en pausa), se minimiza (`F.mini`) a una píldora sobre la barra de abajo que sigue contando («● 58:50 · tarea»); al tocarla vuelves, y al acabar el tiempo se abre sola con el aviso. Otro ▶ con una sesión empezada te devuelve a esa (`focusBusy`). Toda hoja ya tenía su × (probado en `tests/run.mjs`).
 
+### Árboles con relieve y semanas por tareas *(fase 2 · hecha, falta publicar)*
+
+**Problema:** (1) Los árboles eran lisos, «bombones». (2) Con 1 de 5 labs, el objetivo de una semana de THM salía cumplido: una tarea marcaba la semana. (3) En Frentes, una tarea hecha seguía diciendo «Principal hoy». (4) Frentes mostraba en naranja una semana que Metas daba por cumplida.
+
+**Hecho:**
+- Árboles: las copas se arman con matas de borde irregular (`leafy`, semilla fija por especie), oscuras abajo, con luz arriba y hojas en sombra como textura; los pinos tienen puntas irregulares y el tronco se ensancha en la base. El bosque (isla de 3×3 mínimo) queda igual.
+- `goalTasks(g)`: pendientes del frente + hechas en el plazo. `weekQuota` = total / semanas (hacia arriba). `weekAuto(g, i)`: la semana ya empezó y llevas hechas al menos `min(total, cuota × (i+1))` (lo adelantado cuenta). La barra y la leyenda de un proyecto van por tareas («1/5 tareas»); la semana dice «llevas 1 de 5 tareas».
+- `taskRow`: hecha → «Hecha hoy» (o la fecha), sin «Principal».
+- Frentes: «✓ Esta semana: …» en verde cuando está cumplida.
+
 ### Tarea 4: IA dentro de la app *(media)*
 
 Usar la capability `sample` (declararla: `sample:{}`). Se llama solo cuando el usuario toca un botón; nunca al cargar.
