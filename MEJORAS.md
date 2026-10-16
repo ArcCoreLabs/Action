@@ -312,7 +312,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 
 **Hecho:** una × pequeña arriba a la izquierda (`focus-x`, también con Escape). Sin empezar o en la pantalla final, sale sin guardar nada. Empezada (corriendo o en pausa), se minimiza (`F.mini`) a una píldora sobre la barra de abajo que sigue contando («● 58:50 · tarea»); al tocarla vuelves, y al acabar el tiempo se abre sola con el aviso. Otro ▶ con una sesión empezada te devuelve a esa (`focusBusy`). Toda hoja ya tenía su × (probado en `tests/run.mjs`).
 
-### Árboles con relieve y semanas por tareas *(fase 2 · hecha, falta publicar)*
+### Árboles con relieve y semanas por tareas *(fase 2 · hecha, publicada en la versión 22)*
 
 **Problema:** (1) Los árboles eran lisos, «bombones». (2) Con 1 de 5 labs, el objetivo de una semana de THM salía cumplido: una tarea marcaba la semana. (3) En Frentes, una tarea hecha seguía diciendo «Principal hoy». (4) Frentes mostraba en naranja una semana que Metas daba por cumplida.
 
