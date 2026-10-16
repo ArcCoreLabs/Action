@@ -322,7 +322,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 - `taskRow`: hecha → «Hecha hoy» (o la fecha), sin «Principal».
 - Frentes: «✓ Esta semana: …» en verde cuando está cumplida.
 
-### Pantallas dormidas no deshacen lo hecho *(fase 2 · hecha, falta publicar)*
+### Pantallas dormidas no deshacen lo hecho *(fase 2 · hecha, publicada en la versión 23)*
 
 **Problema (16 oct):** una pantalla de la app que llevaba horas en segundo plano despertó con los datos de la tarde anterior. Para ella, «Guided Pentest: Web» seguía sin hacer, así que la pasó a hoy como vencida y, como `put` reemplaza el documento entero, la dejó sin hacer. Además ya estaba «Infrastructure» como Principal de hoy: quedaron dos del mismo proyecto.
 
