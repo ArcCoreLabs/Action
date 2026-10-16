@@ -845,6 +845,31 @@ console.log('\nMetas vivas');
   await nav(p, 'semana'); ok(/Se marcó sola: llevas 5 de 5 tareas/.test(await sm.textContent()) && await sm.locator('.check.on').count() === 1, 'y en Semana también');
   ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
 }
+{ // lo que pasó el 16 oct: una pantalla que despierta con datos viejos no deshace una Principal hecha en otra
+  const N2 = add(TODAY, 1), seed = { 'fronts/b':{ name:'THM', status:'active', order:1, created:1 }, 'meta/settings':{}, 'meta/focus':{ days:{} },
+    'habits/hb':{ name:'THM', days:[4,5,6,0], frontId:'b', log:{}, order:1, created:TODAY },
+    'tasks/w':{ title:'Web', frontId:'b', minutes:60, slot:'critical', date:TODAY, done:false, created:1 },
+    'tasks/i':{ title:'Infrastructure', frontId:'b', minutes:60, slot:null, date:null, done:false, created:2 },
+    'tasks/k':{ title:'Kill Chain', frontId:'b', minutes:60, slot:null, date:null, done:false, created:3 } };
+  const p = await b.newPage({ viewport:{ width:390, height:860 } }); p.errs = []; p.on('pageerror', e => p.errs.push(e.message));
+  await p.clock.setFixedTime(new Date(TODAY + 'T15:00:00')); await p.addInitScript(s => { window.__SEED = s; }, seed);
+  await p.goto('file://' + page); await p.waitForSelector('.sec-head'); await p.waitForTimeout(400);
+  await p.evaluate(([y, n]) => { window.__MUTE = true; const s = window.__store; // esta pantalla queda dormida; en otra se hace la Principal y a medianoche sale la siguiente
+    s['tasks/w'] = { ...s['tasks/w'], done:true, doneAt:y }; s['tasks/i'] = { ...s['tasks/i'], slot:'critical', date:n }; }, [TODAY, N2]);
+  await p.clock.setFixedTime(new Date(N2 + 'T10:03:00')); await p.evaluate(() => document.dispatchEvent(new Event('visibilitychange'))); await p.waitForTimeout(800);
+  const st = await p.evaluate(() => ({ w:window.__store['tasks/w'], i:window.__store['tasks/i'], k:window.__store['tasks/k'] }));
+  ok(st.w.done === true && st.w.date === TODAY && !st.w.since && !st.w.missed, `al despertar con datos viejos no vuelve a abrir la Principal hecha (${JSON.stringify(st.w)})`);
+  ok(st.i.slot === 'critical' && st.i.date === N2 && !st.k.slot, 'y la de hoy sigue siendo una sola: Infrastructure');
+  ok(!p.errs.length, 'sin errores ' + p.errs.join('|')); await p.close();
+}
+{ // si igual quedan dos Principales del mismo proyecto hoy, se queda la vencida y la otra vuelve a la lista
+  const seed = { 'fronts/b':{ name:'THM', status:'active', order:1, created:1 }, 'meta/settings':{}, 'meta/focus':{ days:{} },
+    'tasks/w':{ title:'Web', frontId:'b', minutes:60, slot:'critical', date:TODAY, since:add(TODAY, -1), done:false, created:1 },
+    'tasks/i':{ title:'Infrastructure', frontId:'b', minutes:60, slot:'critical', date:TODAY, done:false, created:2 } };
+  const p = await open('light', seed); await p.waitForTimeout(700);
+  const t = await p.locator('.main-task .mt-title').allTextContents(), st = await p.evaluate(() => window.__store['tasks/i']);
+  ok(t.join('|') === 'Web' && !st.slot && !st.date, `dos Principales del mismo proyecto: queda solo la vencida (${t.join(', ')})`); await p.close();
+}
 // ---------- 6h. Frentes plegables ----------
 console.log('\nFrentes plegables');
 { const seed = { 'fronts/a':{ name:'CCFA', status:'active', order:2, created:1 }, 'fronts/h':{ name:'Leer', kind:'habit', status:'active', order:1, created:1 },

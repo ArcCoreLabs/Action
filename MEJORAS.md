@@ -322,6 +322,16 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 - `taskRow`: hecha → «Hecha hoy» (o la fecha), sin «Principal».
 - Frentes: «✓ Esta semana: …» en verde cuando está cumplida.
 
+### Pantallas dormidas no deshacen lo hecho *(fase 2 · hecha, falta publicar)*
+
+**Problema (16 oct):** una pantalla de la app que llevaba horas en segundo plano despertó con los datos de la tarde anterior. Para ella, «Guided Pentest: Web» seguía sin hacer, así que la pasó a hoy como vencida y, como `put` reemplaza el documento entero, la dejó sin hacer. Además ya estaba «Infrastructure» como Principal de hoy: quedaron dos del mismo proyecto.
+
+**Hecho:**
+- `planWrites()` calcula lo que habría que escribir; `autoPlan` (ahora async) solo escribe si hay algo y, antes, lee las tareas del servidor (`db.collection("tasks").get()`, se salta si `fromCache`) y vuelve a calcular con esos datos.
+- Si hay dos Principales sin hacer del mismo proyecto hoy, se queda la vencida (`since`) y la otra vuelve a la lista.
+- Al volver a la app (`visibilitychange`) se revisa el día de una vez, sin esperar el minuto.
+- `tests/mock.js`: `collection().get()` y `window.__MUTE` (una pantalla que deja de recibir cambios). La prueba reproduce el caso y falla sin el arreglo.
+
 ### Tarea 4: IA dentro de la app *(media)*
 
 Usar la capability `sample` (declararla: `sample:{}`). Se llama solo cuando el usuario toca un botón; nunca al cargar.

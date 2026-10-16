@@ -787,19 +787,35 @@ function assign(id, date, slot, quiet){
   return true;
 }
 const PLANNED = new Set(); // proyectos ya llenados hoy en esta sesión (evita repetir la escritura mientras llega la respuesta)
-function autoPlan(){ // la Principal de cada proyecto se llena sola el día que le toca; la que no cumpliste sigue, en rojo, hasta que la hagas
-  if (!loaded()) return;
-  const d = today();
+function planWrites(){ // lo que autoPlan escribiría con los datos que tiene ahora (sin escribir nada)
+  const d = today(), w = [], keys = [];
   projects().forEach(f => {
-    const k = d + "|" + f.id; if (PLANNED.has(k) || critOf(d, f.id)) return;
+    const k = d + "|" + f.id, mine = S.tasks.filter(t => t.frontId === f.id && t.slot === "critical" && !t.done && t.date === d);
+    if (mine.length > 1){ const keep = mine.find(t => t.since) || mine[0]; mine.filter(t => t !== keep).forEach(t => w.push({...t, slot:null, date:null})); return; } // dos del mismo proyecto hoy: se queda la vencida y la otra vuelve a la lista
+    if (PLANNED.has(k) || critOf(d, f.id)) return;
     const late = S.tasks.filter(t => t.frontId === f.id && t.slot === "critical" && !t.done && t.date && t.date < d).sort((a,b) => a.date.localeCompare(b.date));
-    if (late.length){ PLANNED.add(k); const t = late[0];
-      put("tasks", {...t, ...(dueOn(f, t.date) ? {missed:[...(t.missed || []), t.date]} : {}), since:t.since || t.date, date:d}); // vencida: pasa a hoy y el día fallado queda guardado
-      late.slice(1).forEach(x => put("tasks", {...x, ...(dueOn(f, x.date) ? {missed:[...(x.missed || []), x.date]} : {}), date:null, slot:null}));
+    if (late.length){ keys.push(k); const t = late[0];
+      w.push({...t, ...(dueOn(f, t.date) ? {missed:[...(t.missed || []), t.date]} : {}), since:t.since || t.date, date:d}); // vencida: pasa a hoy y el día fallado queda guardado
+      late.slice(1).forEach(x => w.push({...x, ...(dueOn(f, x.date) ? {missed:[...(x.missed || []), x.date]} : {}), date:null, slot:null}));
       return; }
     if (f.planSkip === d || !dueOn(f, d)) return;
-    const t = nextTask(f.id); if (t){ PLANNED.add(k); put("tasks", {...t, slot:"critical", date:d, done:false, doneAt:null}); }
+    const t = nextTask(f.id); if (t){ keys.push(k); w.push({...t, slot:"critical", date:d, done:false, doneAt:null}); }
   });
+  return {w, keys};
+}
+let planning = false;
+async function autoPlan(){ // la Principal de cada proyecto se llena sola el día que le toca; la que no cumpliste sigue, en rojo, hasta que la hagas
+  if (!loaded() || planning || !planWrites().w.length) return;
+  planning = true;
+  try {
+    if (mode === "db"){ // antes de mover nada, lee las tareas del servidor: una pantalla que despierta con datos viejos no debe deshacer lo que hiciste en otra
+      const s = await db.collection("tasks").get();
+      if (s.metadata && s.metadata.fromCache) return; // sin datos definitivos no se planea; la próxima actualización lo intenta de nuevo
+      S.tasks = s.docs.map(x => ({id:x.id, ...x.data()}));
+    }
+    const p = planWrites(); p.keys.forEach(k => PLANNED.add(k)); p.w.forEach(t => put("tasks", t));
+  } catch(e){ /* sin conexión: se intenta en la próxima actualización */ }
+  finally { planning = false; sched(); }
 }
 let planT; const planSoon = () => { clearTimeout(planT); planT = setTimeout(autoPlan, 300); };
 function unassign(id){ const t = task(id); if (!t) return; const {since, ...t0} = t; put("tasks", {...t0, ...keepMiss(t), date:null, slot:null});
@@ -1946,7 +1962,9 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden && F.
 
 /* ================= arranque ================= */
 let lastDay = today(), lastLine = "";
-setInterval(() => { const k = mode === "connecting" ? "" : dayLine().k; if (today() !== lastDay || k !== lastLine){ lastDay = today(); lastLine = k; sched(); planSoon(); } }, 60000); // cambio de día y paso al Plan B
+const dayCheck = () => { const k = mode === "connecting" ? "" : dayLine().k; if (today() !== lastDay || k !== lastLine){ lastDay = today(); lastLine = k; sched(); planSoon(); } };
+setInterval(dayCheck, 60000); // cambio de día y paso al Plan
+document.addEventListener("visibilitychange", () => { if (!document.hidden) dayCheck(); }); // al volver a la app (iPhone en segundo plano) revisa el día de una B
 async function init(){
   render();
   try { if (window.claude && window.claude.use) window.claude.use("downloads").then(x => { dl = x || null; }, () => {}); } catch(e){}
