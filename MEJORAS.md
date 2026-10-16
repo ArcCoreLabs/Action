@@ -306,7 +306,7 @@ meta/focus    { days: { "YYYY-MM-DD": minutos } }
 - Ayuda de Objetivos: Plan es el cómo del objetivo, no otra meta.
 - Frentes: cada frente es un plegable (`<details data-fold>`, estado en `FOLD`): los proyectos empiezan abiertos y los hábitos plegados. El título resume («6 pendientes · 2 hechas» / «Hábito · lunes a viernes») y sus ⋯ no lo pliegan. Dentro: objetivo, las 3 tareas que siguen, «N tareas más» y «Hechas (N)» plegadas (recuerdan si las abriste).
 
-### Salir del enfoque *(fase 2 · hecha, falta publicar)*
+### Salir del enfoque *(fase 2 · hecha, publicada en la versión 21)*
 
 **Problema:** el temporizador a pantalla completa no tenía cómo devolverse sin empezar o terminar.
 
